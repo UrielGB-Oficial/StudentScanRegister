@@ -10,10 +10,15 @@
 *.userosscache
 *.sln.docstates
 *.env
-*.csv
-*.json
 *.local
-*.png
+
+generador_qr/src/data/input/*.csv
+generador_qr/src/data/registro_csv.json
+generador_qr/src/data/qr_registro.json
+generador_qr/src/data/output/
+.venv/
+__pycache__/
+*.pyc
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
