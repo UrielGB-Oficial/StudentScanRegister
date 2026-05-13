@@ -65,8 +65,14 @@ def procesar_archivo(ruta_completa, tabla_hash=None, guardar=True):
         return False
 
     logging.info(f"Archivo nuevo detectado: '{archivo}'. Procesando...")
-    # Aquí iría la lógica de generación de QR (o cualquier otra acción por archivo)
-    # Por ahora dejamos una marca simple
+    # Integración con generación de QR
+    try:
+        from generadorQr import procesar_csv_y_generar_qrs
+        qrs_generados = procesar_csv_y_generar_qrs(ruta_completa)
+        logging.info(f"Generación de QR completada: {qrs_generados} QR nuevos.")
+    except Exception as e:
+        logging.warning(f"No se pudo generar QR para '{archivo}': {e}. Continuando con registro...")
+
     tabla_hash[hash_archivo] = archivo
     if guardar:
         guardar_tabla_hash(tabla_hash)
