@@ -1,0 +1,22 @@
+[Unit]
+Description=StudentScanRegister Scanner Service
+After=network.target
+
+[Service]
+Type=simple
+# Load variables from environment file (edit ssr-scanner.env before enabling)
+EnvironmentFile=/home/Cristhian/Dev/StudentScanRegister/escaner_qr/ssr-scanner.env
+User=%i
+WorkingDirectory=${WORKDIR}
+ExecStart=${VENV_PATH}/bin/python ${WORKDIR}/src/escaner.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+# Usage:
+# 1) Copy this file to /etc/systemd/system/ssr-scanner@Cristhian.service
+# 2) Edit ssr-scanner.env with correct values and ownership.
+# 3) sudo systemctl daemon-reload && sudo systemctl enable --now ssr-scanner@Cristhian

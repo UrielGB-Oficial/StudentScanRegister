@@ -400,6 +400,67 @@ export default function QRBuscador() {
 - **Value:** Ruta a la imagen PNG del QR
 - **Propósito:** Búsqueda O(1) sin regenerar duplicados
 
+---
+
+## Escáner USB (Raspberry Pi) — Instalación y despliegue
+
+Este proyecto incluye un componente para leer un lector USB que emula teclado y registrar asistencias en la Raspberry Pi usando SQLite y reintentos automáticos.
+
+Archivos relevantes:
+- `escaner_qr/src/escaner.py` — script que lee el lector (stdin), valida contra la API de QRs y guarda filas en `escaner_qr/data/scanner.db`.
+- `escaner_qr/requerimientos.txt` — dependencias `pip` necesarias para el script (ej. `requests`).
+- `escaner_qr/ssr-scanner.env` — ejemplo de variables de entorno para el servicio (editar antes de usar).
+- `escaner_qr/ssr-scanner.service` — unidad `systemd` (instanciable: `ssr-scanner@<user>.service`).
+- `escaner_qr/install_scanner_service.sh` — helper para copiar la unidad y el env a `/etc`.
+
+Pasos rápidos (en la Pi)
+
+1) Crear virtualenv e instalar dependencias:
+```bash
+cd /home/Cristhian/Dev/StudentScanRegister/escaner_qr
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requerimientos.txt
+```
+
+2) Editar variables de entorno de ejemplo (`escaner_qr/ssr-scanner.env`) y ajustarlas a tu entorno (rutas, usuario, APIs).
+
+3) Instalar la unidad systemd (requiere sudo):
+```bash
+cd /home/Cristhian/Dev/StudentScanRegister/escaner_qr
+chmod +x install_scanner_service.sh
+sudo ./install_scanner_service.sh
+# Edita /etc/default/ssr-scanner.env con valores correctos
+sudo systemctl daemon-reload
+sudo systemctl enable --now ssr-scanner@<user>.service
+sudo journalctl -u ssr-scanner@<user>.service -f
+```
+
+4) Probar manualmente sin systemd (útil para debugging):
+```bash
+source .venv/bin/activate
+python src/escaner.py
+# Pon el foco en la terminal y escanea con el lector USB
+```
+
+Comportamiento y buenas prácticas
+- El script guarda cada escaneo en `escaner_qr/data/scanner.db` (tabla `scans`) y marca si fue enviado (`sent`).
+- Si el `ATTENDANCE_API` no está disponible, el script reintenta enviar filas pendientes periódicamente.
+- Asegúrate de que el lector envíe un `Enter` tras cada escaneo (modo teclado HID por defecto).
+- Revisa los logs via `journalctl` cuando el servicio esté activo.
+
+Comandos útiles
+- Ver últimas filas de la base de datos:
+```bash
+sqlite3 /home/Cristhian/Dev/StudentScanRegister/escaner_qr/data/scanner.db "SELECT id,date,qr_hash,nombre,sent FROM scans ORDER BY id DESC LIMIT 10;"
+```
+- Ver logs en tiempo real:
+```bash
+sudo journalctl -u ssr-scanner@<user>.service -f
+```
+
+Si quieres, puedo añadir copias de seguridad automáticas del `scanner.db` y rotación de logs.
+
 ### 3. **Contenido del QR**
 Cada QR contiene un JSON con datos del alumno:
 ```json
