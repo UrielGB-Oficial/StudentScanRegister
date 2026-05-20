@@ -564,5 +564,5 @@ MIT License - Ver LICENSE.md para más detalles
 Para reportar bugs o sugerir mejoras, abre un issue en el repositorio.
 
 **Autor:** Cristhian  
-**Email:** tu-email@example.com  
+**Email:** cristhian.ramirez9292@alumnos.udg.mx 
 **GitHub:** https://github.com/tuusuario/StudentScanRegister
