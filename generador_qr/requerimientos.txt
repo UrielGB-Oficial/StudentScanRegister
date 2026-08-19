@@ -1,5 +1,0 @@
-pillow>=10.0.0
-qrcode~=8.0
-watchdog>=2.1
-flask>=2.0.0
-flask-cors>=3.0.0
