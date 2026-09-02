@@ -119,6 +119,7 @@ CRUD completo de clases, profesores y alumnos para la interfaz de administrador:
 | `POST` | `/profesores` | Crear profesor |
 | `DELETE/POST` | `/profesores/{id}/eliminar` | Eliminar profesor |
 
+
 #### [MODIFY] [listado.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/app/routers/listado.py)
 
 Alta masiva de alumnos vía Excel y visualización de asistencia:

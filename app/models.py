@@ -11,7 +11,7 @@ from sqlmodel import Field, Relationship, SQLModel
 # ─────────────────────────────────────────────
 class Profesor(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    codigo_profesor: str = Field(max_length=9, unique=True, index=True)
+    codigo_profesor: str = Field(max_length=20, unique=True, index=True)
     nombre_profesor: str = Field(max_length=64)
     clases: list["Clase"] = Relationship(back_populates="profesor")
 
