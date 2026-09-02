@@ -1,227 +1,188 @@
-# Sistema de Registro de Asistencia — Plan de Implementación
+# 📡 Sistema de Registro de Asistencia por Código de Barras
 
-Sistema completo para registrar asistencia en un taller de redes vía lectores de código de barras sobre credenciales, corriendo en una Raspberry Pi 3 headless.
-
-## Decisiones de diseño confirmadas
-
-- **Un profesor puede tener múltiples clases.** Al escanear su credencial el sistema entra en **modo espera**; el primer alumno que llegue determina qué clase se abre automáticamente.
-- **El script `lector.py` se comunica con el servidor via HTTP interno** (llamadas a `localhost`), manteniendo toda la lógica en FastAPI.
-- **Una sesión es válida durante todo el día calendario** en que fue creada (no hay límite estricto de 2 horas). Así los alumnos que lleguen tarde pueden registrarse sin problema. Dos clases distintas (ej. Redes 1 y Redes 3) el mismo día **no se interfieren** porque cada alumno pertenece a una sola clase y el sistema busca la sesión de *su* clase específica.
-- **Formato del Excel de alumnos:** dos columnas — `codigo` (número de control de 9 dígitos) y `nombre` (nombre completo). El profesor lo sube una vez al inicio del semestre desde la interfaz de administrador.
+Sistema monolítico ligero y autónomo desarrollado para la gestión y registro de asistencia en laboratorios/talleres de cómputo. Diseñado para operar sobre **Raspberry Pi 3 (Headless)** mediante lectores de código de barras USB que leen credenciales institucionales.
 
 ---
 
-## Flujo completo del sistema
+## 🌟 Características Principales
 
-```
-[Lector USB] → evdev → lector.py → HTTP POST localhost → FastAPI → SQLite
-                                                              ↑
-[Navegador admin] ────────────────────────────── HTTP → FastAPI (Jinja2)
-```
-
-**Flujo del profesor:**
-1. Profesor escanea → `POST /api/scan` con su código de 9 dígitos.
-2. El servidor identifica que es un profesor → responde `{"tipo": "profesor"}` y guarda en memoria (o BD) que ese profesor está en **modo espera** (sin sesión aún abierta).
-3. El sistema espera a que llegue el **primer alumno** para determinar la clase.
-
-**Flujo del alumno (cuando hay profesor en espera):**
-1. Alumno escanea → `POST /api/scan`.
-2. El servidor identifica al alumno y sabe a qué clase pertenece.
-3. **¿El profesor en espera imparte esa clase?**
-   - ✅ Sí → Abre sesión para esa clase **y** registra al alumno en un solo paso.
-   - ❌ No → Rechaza con error (alumno no corresponde al profesor activo).
-4. Siguientes alumnos escanean → se registran en la sesión ya abierta.
-5. Si ya registró asistencia → actualiza `hora` (no duplica).
-
-**Flujo del alumno (cuando ya hay sesión abierta):**
-1. Alumno escanea → el servidor registra asistencia directamente en la sesión activa de su clase.
-
-> [!NOTE]
-> El **"modo espera"** del profesor se guarda como una fila temporal en una tabla `EstadoEspera` (o en memoria con un dict en FastAPI). Se limpia automáticamente al final del día o cuando el sistema se reinicia.
+* **Apertura de Sesión Dinámica:** El profesor escanea su credencial para entrar en *Modo Espera*. La sesión de la clase correspondiente se crea automáticamente en cuanto el **primer alumno** de dicha clase escanea su credencial.
+* **Captura Hardware vía `evdev`:** El lector USB se intercepta directamente como dispositivo de entrada sin requerir pantalla, foco en ventana ni interfaz gráfica.
+* **Sesión Diaria Tolerante:** Las sesiones son válidas durante todo el día calendario, permitiendo el registro de alumnos con retardos sin cortar la sesión.
+* **Alta Masiva de Alumnos:** Carga rápida de listas de alumnos mediante archivos Excel (`.xlsx`).
+* **Exportación de Reportes:** Generación y descarga de listas de asistencia consolidadas en Excel.
+* **UI Administrativa Oscura Modernizada:** Interfaz Web receptiva construida con CSS vanilla en estilo *glassmorphism*, optimizada para consumo mínimo de recursos.
+* **Servicios de Resiliencia en Linux:** Preparado para correr como demonios del sistema (`systemd`) con reinicio automático tras fallos de energía.
 
 ---
 
-## Proposed Changes
+## 🏗️ Arquitectura del Sistema
 
-### 1 — Modelos (`app/models.py`)
+El proyecto opera bajo un modelo desacoplado local donde el script del lector e interfaces administrativas convergen en un backend centralizado con FastAPI.
 
-#### [MODIFY] [models.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/app/models.py)
+┌────────────────────────┐      evdev       ┌────────────────────┐
+│ Lector USB Credenciales│ ───────────────> │ scanner/lector.py  │
+└────────────────────────┘                  └─────────┬──────────┘
+│ HTTP POST
+▼
+┌────────────────────────┐   HTTP / HTML    ┌────────────────────┐
+│ Panel Admin (Navegador)│ <──────────────> │   FastAPI Server   │
+└────────────────────────┘                  │  (uvicorn:8000)    │
+└─────────┬──────────┘
+│
+▼
+┌────────────────────┐
+│ SQLite Database    │
+│ (data/registro.db) │
+└────────────────────┘
 
-Reemplazar con los 5 modelos SQLModel definitivos:
+StudentScanRegister/
+├── app/
+│   ├── main.py              # Punto de entrada de FastAPI y middleware
+│   ├── database.py          # Configuración de SQLite y engine SQLModel
+│   ├── models.py            # Modelos de datos (Profesor, Clase, Alumno, Sesion, Asistencia)
+│   ├── routers/
+│   │   ├── asistencias.py   # Endpoint /api/scan, lógica de negocio y exportación Excel
+│   │   ├── clases.py        # CRUD de Clases y Profesores
+│   │   └── listado.py       # Carga masiva de alumnos y consulta de asistencia
+│   ├── static/
+│   │   └── style.css        # Estilos CSS globales (Dark glassmorphism)
+│   └── templates/           # Plantillas Jinja2 (base, clases, alumnos, asistencia, etc.)
+├── scanner/
+│   └── lector.py            # Script daemon para interceptar hardware USB vía evdev
+├── systemd/
+│   ├── registro.service     # Servicio systemd para el servidor FastAPI
+│   └── lector.service       # Servicio systemd para el script del lector
+├── data/                    # Almacenamiento persistente de la base de datos SQLite
+├── requirements.txt         # Dependencias Python del proyecto
+└── README.md
 
-- **`Profesor`** — `id`, `codigo` (str 9 dígitos, único), `nombre`
-- **`Clase`** — `id`, `nombre`, `profesor_id` (FK → Profesor)
-- **`Alumno`** — `id`, `codigo` (str 9 dígitos, único), `nombre`, `clase_id` (FK → Clase)
-- **`Sesion`** — `id`, `clase_id` (FK → Clase), `fecha` (datetime, default=now)
-- **`Asistencia`** — `id`, `sesion_id` (FK → Sesion), `alumno_id` (FK → Alumno), `hora` (time, default=now)
-  - Restricción UNIQUE en `(sesion_id, alumno_id)` para evitar duplicados a nivel de BD.
+┌──────────────┐       ┌──────────────┐       ┌──────────────┐
+│   Profesor   │ 1 ── N│    Clase     │ 1 ── N│    Alumno    │
+├──────────────┤       ├──────────────┤       ├──────────────┤
+│ id           │       │ id           │       │ id           │
+│ codigo (UNIQ)│       │ nombre       │       │ codigo (UNIQ)│
+│ nombre       │       │ profesor_id  │       │ nombre       │
+└──────────────┘       └──────┬───────┘       │ clase_id     │
+                              │               └──────┬───────┘
+                              │ 1                    │ 1
+                              │                      │
+                              ▼ N                    ▼ N
+                       ┌──────────────┐       ┌──────────────┐
+                       │    Sesion    │ 1 ── N│  Asistencia  │
+                       ├──────────────┤       ├──────────────┤
+                       │ id           │       │ id           │
+                       │ clase_id     │       │ sesion_id    │
+                       │ fecha        │       │ alumno_id    │
+                       └──────────────┘       │ hora         │
+                                              └──────────────┘
 
----
+[ Código Escaneado ]
+                                       │
+                             ¿El código pertenece a...?
+                                       │
+                 ┌─────────────────────┴─────────────────────┐
+                 ▼                                           ▼
+            [ PROFESOR ]                                 [ ALUMNO ]
+                 │                                           │
+    Setea "Profesor en Espera"             ¿Hay un "Profesor en Espera"?
+    en memoria RAM del backend                               │
+                 │                         ┌─────────────────┴─────────────────┐
+                 ▼                         ▼                                   ▼
+          Responde OK (200)             [ SÍ ]                              [ NO ]
+                                           │                                   │
+                           ¿El profesor enseña su clase?         ¿Existe una sesión creada hoy
+                                           │                     para la clase de este alumno?
+                                   ┌───────┴───────┐                           │
+                                   ▼               ▼                   ┌───────┴───────┐
+                                [ SÍ ]          [ NO ]                 ▼               ▼
+                                   │               │                [ SÍ ]          [ NO ]
+                            Crea Sesión Hoy    Error (400)             │               │
+                           + Asistencia 1er    Clase no        Registra/Actualiza  Error (400)
+                                Alumno         corresponde        Asistencia       Sin sesión
 
-### 2 — Base de datos (`app/database.py`)
+# Clonar el repositorio
+git clone https://github.com/UrielGB-Oficial/StudentScanRegister.git
+cd StudentScanRegister
 
-#### [MODIFY] [database.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/app/database.py)
+# Crear entorno virtual
+python3 -m venv venv
+source venv/bin/activate
 
-- Crea el `engine` con SQLite en `../data/registro.db`.
-- Función `create_db_and_tables()` que llama a `SQLModel.metadata.create_all()`.
-- Función `get_session()` como dependencia de FastAPI (generador con `with Session(engine)`).
+# Instalación de paquetes
+pip install --upgrade pip
+pip install -r requirements.txt
 
----
+# Ejecutar en terminal
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-### 3 — API endpoints (`app/routers/`)
+# Requiere permisos de superusuario para leer dispositivos /dev/input/
+sudo ./venv/bin/python scanner/lector.py
 
-#### [MODIFY] [asistencias.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/app/routers/asistencias.py)
+# Services
+[Unit]
+Description=Servidor Backend de Registro de Asistencia (FastAPI)
+After=network.target
 
-Endpoint principal del lector + gestión de asistencias:
+[Service]
+User=pi
+WorkingDirectory=/opt/StudentScanRegister
+ExecStart=/opt/StudentScanRegister/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| `POST` | `/api/scan` | Recibe `{"codigo": "123456789"}`. Identifica si es profesor o alumno y actúa en consecuencia. |
-| `POST` | `/api/sesiones` | Abre una nueva sesión `{"clase_id": 1}`. |
-| `GET` | `/api/sesiones/activa/{clase_id}` | Consulta si hay sesión activa para una clase. |
-| `GET` | `/api/asistencias/{clase_id}/excel` | Genera y descarga el Excel de asistencia. |
+[Install]
+WantedBy=multi-user.target
 
-**Lógica del `POST /api/scan`:**
-```
-código recibido
-  ├─ es Profesor
-  │     └─ guarda "profesor en espera" → {"tipo": "profesor", "nombre": "..."}
-  │
-  ├─ es Alumno
-  │     ├─ ¿hay profesor en espera?
-  │     │     ├─ Sí → ¿el profesor imparte la clase del alumno?
-  │     │     │         ├─ Sí → abre sesión + registra alumno → {"tipo": "alumno", "sesion_abierta": true, "ok": true}
-  │     │     │         └─ No → {"tipo": "alumno", "ok": false, "error": "clase_incorrecta"}
-  │     │     └─ No → busca sesión activa del día para la clase del alumno
-  │     │                 ├─ hay sesión → registra asistencia → {"tipo": "alumno", "ok": true}
-  │     │                 └─ no hay    → {"tipo": "alumno", "ok": false, "error": "sin_sesion"}
-  │
-  └─ desconocido → {"tipo": "desconocido"}
-```
+# Lector
+[Unit]
+Description=Demonio Lector de Código de Barras USB
+After=registro.service
+Requires=registro.service
 
-> [!IMPORTANT]
-> El estado "profesor en espera" se guarda en un diccionario en memoria dentro de FastAPI (un simple `dict` a nivel de módulo). Es suficiente porque la Pi no se reinicia durante una clase. Se limpia al final del día o al reiniciar el servidor.
+[Service]
+User=root
+WorkingDirectory=/opt/StudentScanRegister
+ExecStart=/opt/StudentScanRegister/venv/bin/python scanner/lector.py
+Restart=always
+RestartSec=5
 
-**Tabla extra que se añade a los modelos:** `EstadoEspera` con `profesor_id` y `timestamp`. Alternativa más simple: un `dict` en memoria dentro del router (sin tocar la BD). Se usará esta última por simplicidad.
+[Install]
+WantedBy=multi-user.target
 
-#### [MODIFY] [clases.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/app/routers/clases.py)
+# Reload services
+sudo systemctl daemon-reload
 
-CRUD completo de clases, profesores y alumnos para la interfaz de administrador:
+# Enable auto-start services
+sudo systemctl enable registro.service
+sudo systemctl enable lector.service
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| `GET` | `/clases` | Página principal — lista de clases |
-| `POST` | `/clases` | Crear clase |
-| `GET` | `/clases/{id}/editar` | Formulario de edición |
-| `PUT/POST` | `/clases/{id}` | Actualizar clase |
-| `DELETE/POST` | `/clases/{id}/eliminar` | Eliminar clase |
-| `GET` | `/profesores` | Lista de profesores |
-| `POST` | `/profesores` | Crear profesor |
-| `DELETE/POST` | `/profesores/{id}/eliminar` | Eliminar profesor |
+# Start services
+sudo systemctl start registro.service
+sudo systemctl start lector.service
 
+# Status
+sudo systemctl status registro.service
+sudo systemctl status lector.service
 
-#### [MODIFY] [listado.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/app/routers/listado.py)
+# Ver estado del servidor Web
+sudo systemctl status registro.service
 
-Alta masiva de alumnos vía Excel y visualización de asistencia:
+# Ver registros en tiempo real del lector de credenciales
+sudo journalctl -u lector.service -f
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| `GET` | `/clases/{id}/alumnos` | Página de alumnos de una clase |
-| `POST` | `/clases/{id}/alumnos/upload` | Sube Excel con columnas `codigo` y `nombre` (primera hoja, fila 1 = encabezados) |
-| `POST` | `/clases/{id}/alumnos` | Alta manual de un alumno |
-| `DELETE/POST` | `/alumnos/{id}/eliminar` | Eliminar alumno |
-| `GET` | `/clases/{id}/asistencia` | Página de vista de asistencia (tabla HTML) |
+# Para realizar la carga masiva de alumnos a una clase desde el panel administrativo, prepare un archivo .xlsx en la primera hoja con el siguiente formato exacto en los encabezados de la fila 
 
----
+#   codigo   |   nombre          
+219304859    | Juan Pérez López
+219304860    | María Elena García
 
-### 4 — Servidor principal (`app/main.py`)
+⚠️ Importante: La columna codigo debe ser tratada como formato Texto en Excel para prevenir que la pérdida de ceros a la izquierda afecte a números de control institucionales.
 
-#### [MODIFY] [main.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/app/main.py)
-
-- Inicializa la app FastAPI con título y descripción.
-- Monta `StaticFiles` en `/static`.
-- Configura `Jinja2Templates` apuntando a `templates/`.
-- Registra los 3 routers.
-- En `startup`: llama a `create_db_and_tables()`.
-- Ruta raíz `/` redirige a `/clases`.
-
----
-
-### 5 — Interfaz de administrador (`app/templates/` + `app/static/`)
-
-Diseño oscuro moderno con glassmorphism, usando CSS vanilla y JS mínimo. Sin frameworks de frontend.
-
-#### [NEW] Archivos de plantillas
-
-| Archivo | Contenido |
-|---------|-----------|
-| `base.html` | Layout base con nav, head, fuentes Google (Inter), CSS global |
-| `clases.html` | Lista de clases + modal para crear/editar |
-| `profesores.html` | Lista de profesores + formulario inline |
-| `alumnos.html` | Lista de alumnos de una clase + botón de subir Excel |
-| `asistencia.html` | Tabla de asistencia (alumnos × sesiones) con celda ✓/— |
-
-#### [NEW] `app/static/style.css`
-
-Tokens de diseño:
-- Paleta oscura: `#0a0e1a` (fondo), `#111827` (cards), `#6366f1` (acento índigo)
-- Glassmorphism en cards y modales
-- Animaciones de entrada suaves (`fade-in`, `slide-up`)
-- Tabla de asistencia con sticky headers
-
----
-
-### 6 — Script del lector (`scanner/lector.py`)
-
-#### [MODIFY] [lector.py](file:///c:/Users/Uriel/Desktop/Proyectitos/StudentScanRegister/scanner/lector.py)
-
-- Usa `evdev` para leer el lector USB como dispositivo de entrada (no como teclado del sistema).
-- Detecta el dispositivo automáticamente buscando un input device que contenga "barcode" o "scanner" en su nombre; con fallback a listado manual.
-- Acumula caracteres hasta recibir `KEY_ENTER` (código completo).
-- `POST http://localhost:8000/api/scan` con el código.
-- **Sin menú de selección** — el script simplemente reenvía todos los códigos al servidor y muestra en consola la respuesta:
-  - `[PROFESOR]  Juan Pérez — esperando primer alumno...`
-  - `[SESIÓN ABIERTA]  Redes I — 09:15 AM`
-  - `[ASISTENCIA]  María López ✓`
-  - `[ERROR]  Alumno no corresponde al profesor activo`
-  - `[ERROR]  No hay sesión activa para esta clase`
-- Imprime mensajes claros en consola para cada evento.
-
-> [!NOTE]
-> `evdev` solo funciona en Linux. El script tiene un bloque `try/import` con mensaje claro si se corre en Windows (para desarrollo).
-
----
-
-### 7 — Archivos de infraestructura
-
-#### [NEW] `systemd/registro.service`
-
-Unidad systemd para el servidor FastAPI (con `uvicorn`). Restart automático.
-
-#### [NEW] `systemd/lector.service`
-
-Unidad systemd para el script `lector.py`. Restart automático. Depende de `registro.service`.
-
-#### [NEW] `README.md` (actualizar)
-
-Instrucciones de instalación en la Pi, activación de los servicios systemd, y uso del sistema.
-
----
-
-## Verification Plan
-
-### Automated
-- `python -c "from app.models import *; print('models OK')"` — verifica imports.
-- `uvicorn app.main:app --reload` — verifica que el servidor arranca sin errores.
-- Curl manual a `/api/scan`, `/api/sesiones`, y descarga del Excel.
-
-### Manual
-- Crear un profesor y clase desde la UI, subir Excel de alumnos, simular scans via curl, verificar tabla de asistencia y descarga de Excel.
-
----
-
-## ✅ Todas las preguntas resueltas — listo para implementar
-
-- **Duración de sesión:** Definida como "sesión diaria" (cualquier registro en la fecha actual cuenta como asistencia).
-- **Formato Excel:** Columnas `codigo` (tipo texto/string para conservar ceros a la izquierda) y `nombre`.
-S
+🔌 Referencia de la API HTTP
+Método	Ruta	Descripción	Payload / Params
+POST	/api/scan	Procesa código escaneado	{"codigo": "219304859"}
+POST	/api/sesiones	Abre sesión manual para una clase	{"clase_id": 1}
+GET	/api/sesiones/activa/{clase_id}	Consulta sesión del día	N/A
+GET	/api/asistencias/{clase_id}/excel	Descarga reporte acumulado de asistencias	N/A
+POST	/clases/{id}/alumnos/upload	Carga masiva de lista de alumnos	multipart/form-data
