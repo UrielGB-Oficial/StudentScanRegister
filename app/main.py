@@ -15,7 +15,7 @@ from app.routers import asistencias, clases, listado
 # ─────────────────────────────────────────────────────────────
 # EVENTO DE ARRANQUE
 # ─────────────────────────────────────────────────────────────
-@asynccontextmanagers
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     yield
