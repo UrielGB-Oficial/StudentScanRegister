@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block titulo %}Taller de Redes{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  {# ── Barra de Navegación ── #}
+  <nav>
+    <a class="nav-brand" href="/clases">
+      📡 <span>Taller de Redes</span>
+    </a>
+    <div class="nav-links">
+      <a href="/clases">Mis Grupos</a>
+      <a href="/logout">Cerrar sesión</a>
+    </div>
+  </nav>
+
+  {# ── Contenido principal — cada plantilla lo define ── #}
+  <main class="container">
+    {% block contenido %}{% endblock %}
+  </main>
+
+  {# ── Scripts compartidos ── #}
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>

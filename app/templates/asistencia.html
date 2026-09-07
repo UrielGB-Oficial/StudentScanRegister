@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block titulo %}Asistencia: {{ clase.nombre_clase }} — Taller de Redes{% endblock %}
+
+{% block contenido %}
+
+  {# ── Encabezado ── #}
+  <div class="page-header animate-in">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+      <div>
+        <a href="/clases" style="color:var(--azul-medio); font-size:0.85rem; text-decoration:none;">
+          ← Mis grupos
+        </a>
+        <h1>Asistencias — {{ clase.nombre_clase }}</h1>
+        <p>{{ alumnos_total }} alumnos · {{ sesiones | length }} sesiones registradas</p>
+      </div>
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+        {# Botón descargar Excel #}
+        <a class="btn btn-secundario" href="/api/asistencias/{{ clase.id }}/excel">
+          📥 Descargar Excel
+        </a>
+        {# Botón ver alumnos #}
+        <a class="btn btn-primario" href="/clases/{{ clase.id }}/alumnos">
+          👥 Gestionar alumnos
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# ── Tabla de Asistencias ── #}
+  {% if filas %}
+    <div class="tabla-wrapper animate-in">
+      <table class="tabla-asistencia">
+        <thead>
+          <tr>
+            <th style="min-width:60px;">Cód.</th>
+            <th style="min-width:200px;">Nombre del Alumno</th>
+            {# Una columna por cada sesión (fecha) #}
+            {% for sesion in sesiones %}
+              <th class="col-fecha" title="{{ sesion.fecha }}">
+                {{ sesion.fecha.strftime('%d/%m') }}
+              </th>
+            {% endfor %}
+            <th class="col-faltas">Faltas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in filas %}
+            <tr>
+              <td style="font-size:0.8rem; color:var(--texto-suave);">{{ fila.alumno.codigo_alumno }}</td>
+              <td><strong>{{ fila.alumno.nombre_alumno }}</strong></td>
+              {% for asistio in fila.sesiones_asistidas %}
+                <td class="col-centro">
+                  {% if asistio %}
+                    <span class="celda-presente">✓</span>
+                  {% else %}
+                    <span class="celda-falta">—</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+              {# Columna de Faltas: total de sesiones menos asistencias #}
+              <td class="col-centro">
+                {% set faltas = (sesiones | length) - fila.total %}
+                {% if faltas > 0 %}
+                  <span class="badge-faltas">{{ faltas }}</span>
+                {% else %}
+                  <span style="color:var(--exito); font-weight:600;">0</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% else %}
+    {# Estado vacío: sin alumnos o sin sesiones #}
+    <div class="card animate-in" style="text-align:center; padding:3rem 2rem;">
+      <div style="font-size:3rem; margin-bottom:1rem;">📋</div>
+      {% if not sesiones %}
+        <h3 style="color:var(--texto-suave);">Sin sesiones registradas</h3>
+        <p style="color:var(--texto-suave); margin-top:0.5rem;">
+          Cuando el profesor escanee su credencial y llegue el primer alumno,
+          la primera sesión se abrirá automáticamente.
+        </p>
+      {% else %}
+        <h3 style="color:var(--texto-suave);">Sin alumnos en este grupo</h3>
+        <p style="color:var(--texto-suave); margin-top:0.5rem;">
+          <a href="/clases/{{ clase.id }}/alumnos">Sube la lista de alumnos</a> para comenzar.
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+
+  {# ── Botones de Acción (al pie, como en el wireframe) ── #}
+  <div style="display:flex; gap:0.75rem; margin-top:1.5rem; flex-wrap:wrap;">
+
+    {# Editar nombre del grupo #}
+    <button class="btn-icono btn-icono-editar" id="btn-editar-grupo" title="Editar grupo">
+      ✏️
+    </button>
+
+    {# Eliminar grupo #}
+    <button class="btn-icono btn-icono-borrar" id="btn-eliminar-grupo"
+            title="Eliminar grupo" onclick="confirmarEliminar()">
+      🗑️
+    </button>
+
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════
+     MODAL: Editar nombre del grupo
+     ══════════════════════════════════════════════════════════ #}
+  <div class="modal-overlay" id="modal-editar">
+    <div class="modal-box animate-in">
+      <h3>Editar grupo</h3>
+      <form method="POST" action="/clases/{{ clase.id }}/editar">
+        <input type="hidden" name="profesor_id" value="{{ clase.profesor_id }}" />
+        <div class="form-group" style="margin-top:1rem;">
+          <label for="nuevo-nombre">Nombre del grupo</label>
+          <input id="nuevo-nombre" name="nombre_clase" type="text"
+                 value="{{ clase.nombre_clase }}" required />
+        </div>
+        <div class="modal-acciones">
+          <button type="button" class="btn btn-secundario" id="btn-cancelar-editar">Cancelar</button>
+          <button type="submit" class="btn btn-primario">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════
+     MODAL: Confirmación de Eliminar grupo
+     ══════════════════════════════════════════════════════════ #}
+  <div class="modal-overlay" id="modal-confirmar">
+    <div class="modal-box">
+      <h3>¿Estás seguro?</h3>
+      <p>
+        Esto eliminará el grupo <strong>{{ clase.nombre_clase }}</strong>,
+        todos sus alumnos y todos los registros de asistencia. No se puede deshacer.
+      </p>
+      <div class="modal-acciones">
+        <button class="btn btn-secundario" id="btn-cancelar-eliminar">Cancelar</button>
+        <form method="POST" action="/clases/{{ clase.id }}/eliminar">
+          <button type="submit" class="btn btn-peligro">Sí, eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  // Modal Editar
+  const modalEditar = document.getElementById('modal-editar');
+  document.getElementById('btn-editar-grupo').addEventListener('click', () => modalEditar.classList.add('activo'));
+  document.getElementById('btn-cancelar-editar').addEventListener('click', () => modalEditar.classList.remove('activo'));
+  modalEditar.addEventListener('click', (e) => { if (e.target === modalEditar) modalEditar.classList.remove('activo'); });
+
+  // Modal Confirmar Eliminar
+  const modalConfirmar = document.getElementById('modal-confirmar');
+  function confirmarEliminar() { modalConfirmar.classList.add('activo'); }
+  document.getElementById('btn-cancelar-eliminar').addEventListener('click', () => modalConfirmar.classList.remove('activo'));
+  modalConfirmar.addEventListener('click', (e) => { if (e.target === modalConfirmar) modalConfirmar.classList.remove('activo'); });
+</script>
+{% endblock %}

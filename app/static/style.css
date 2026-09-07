@@ -1,1 +1,409 @@
-/* style.css — Se completará en el Paso 7 (interfaz de administrador) */
+/* ================================================================
+   style.css — Sistema de Registro de Asistencias | Taller de Redes
+   Paleta del wireframe:
+     #3368A0  → Azul oscuro principal
+     #66A3BF  → Azul medio
+     #C8DFDB  → Azul claro / teal
+     #F2EFE7  → Crema (fondo general)
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Reset y Variables ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --azul-oscuro:  #3368A0;
+  --azul-medio:   #66A3BF;
+  --azul-claro:   #C8DFDB;
+  --crema:        #F2EFE7;
+  --blanco:       #FFFFFF;
+  --texto:        #1E3A5F;
+  --texto-suave:  #5A7A9A;
+  --error:        #D64545;
+  --exito:        #2E7D52;
+  --sombra:       0 4px 16px rgba(51, 104, 160, 0.12);
+  --sombra-card:  0 2px 8px  rgba(51, 104, 160, 0.10);
+  --radio:        12px;
+  --radio-sm:     8px;
+  --transicion:   0.2s ease;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--crema);
+  color: var(--texto);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Barra de Navegación ───────────────────────────────────── */
+nav {
+  background: var(--azul-oscuro);
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+nav .nav-brand {
+  color: var(--blanco);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+nav .nav-brand span { opacity: 0.7; font-weight: 400; }
+nav .nav-links { display: flex; align-items: center; gap: 1rem; }
+nav .nav-links a {
+  color: var(--azul-claro);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  transition: background var(--transicion), color var(--transicion);
+}
+nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco); }
+
+/* ── Contenedor Principal ──────────────────────────────────── */
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+/* ── Encabezado de Página ──────────────────────────────────── */
+.page-header { margin-bottom: 2rem; }
+.page-header h1 { font-size: 1.8rem; font-weight: 700; color: var(--azul-oscuro); }
+.page-header p  { color: var(--texto-suave); margin-top: 0.25rem; font-size: 0.95rem; }
+
+/* ── Saludo en el Dashboard ────────────────────────────────── */
+.saludo {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--azul-oscuro);
+  margin-bottom: 1.75rem;
+}
+
+/* ── Tarjetas de Grupo (círculos del wireframe) ────────────── */
+.grupos-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.grupo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  transition: transform var(--transicion);
+}
+.grupo-card:hover { transform: translateY(-4px); }
+
+.grupo-circulo {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--azul-oscuro);
+  color: var(--blanco);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  box-shadow: var(--sombra);
+  transition: background var(--transicion), box-shadow var(--transicion);
+  position: relative;
+}
+.grupo-card:hover .grupo-circulo {
+  background: var(--azul-medio);
+  box-shadow: 0 6px 20px rgba(51, 104, 160, 0.25);
+}
+.grupo-nombre {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+  text-align: center;
+  max-width: 96px;
+}
+
+/* Botón de Agregar Grupo (círculo con +) */
+.btn-agregar-grupo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform var(--transicion);
+}
+.btn-agregar-grupo:hover { transform: translateY(-4px); }
+.btn-agregar-grupo .grupo-circulo {
+  background: var(--blanco);
+  border: 3px dashed var(--azul-medio);
+  color: var(--azul-medio);
+  font-size: 2rem;
+  font-weight: 300;
+}
+.btn-agregar-grupo:hover .grupo-circulo {
+  background: var(--azul-claro);
+  border-color: var(--azul-oscuro);
+  color: var(--azul-oscuro);
+}
+
+/* ── Cards genéricas ───────────────────────────────────────── */
+.card {
+  background: var(--blanco);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-card);
+  padding: 1.5rem;
+}
+
+/* ── Formularios ───────────────────────────────────────────── */
+.form-group { margin-bottom: 1.1rem; }
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+  margin-bottom: 0.35rem;
+}
+.form-group input, .form-group select {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid var(--azul-claro);
+  border-radius: var(--radio-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--texto);
+  background: var(--blanco);
+  transition: border-color var(--transicion), box-shadow var(--transicion);
+  outline: none;
+}
+.form-group input:focus, .form-group select:focus {
+  border-color: var(--azul-medio);
+  box-shadow: 0 0 0 3px rgba(102,163,191,0.18);
+}
+
+/* ── Botones ───────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.3rem;
+  border-radius: var(--radio-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transicion);
+}
+.btn-primario { background: var(--azul-oscuro); color: var(--blanco); }
+.btn-primario:hover { background: #274e7a; box-shadow: 0 4px 12px rgba(51,104,160,0.30); }
+.btn-secundario { background: var(--azul-claro); color: var(--texto); }
+.btn-secundario:hover { background: #b0d0cc; }
+.btn-peligro { background: #fce8e8; color: var(--error); }
+.btn-peligro:hover { background: var(--error); color: var(--blanco); }
+.btn-icono {
+  width: 38px; height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transicion);
+}
+.btn-icono-editar  { background: #e8f0f8; color: var(--azul-oscuro); }
+.btn-icono-editar:hover { background: var(--azul-oscuro); color: var(--blanco); }
+.btn-icono-borrar  { background: #fce8e8; color: var(--error); }
+.btn-icono-borrar:hover { background: var(--error); color: var(--blanco); }
+.btn-icono-reset   { background: #e8f4f0; color: var(--exito); }
+.btn-icono-reset:hover { background: var(--exito); color: var(--blanco); }
+
+/* ── Tabla de Asistencias ──────────────────────────────────── */
+.tabla-wrapper { overflow-x: auto; border-radius: var(--radio); box-shadow: var(--sombra-card); }
+.tabla-asistencia {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--blanco);
+  font-size: 0.88rem;
+}
+.tabla-asistencia th {
+  background: var(--azul-oscuro);
+  color: var(--blanco);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+.tabla-asistencia th.col-fecha {
+  text-align: center;
+  font-size: 0.78rem;
+  padding: 0.75rem 0.5rem;
+  min-width: 60px;
+}
+.tabla-asistencia th.col-faltas {
+  background: #4a3b6b;
+  text-align: center;
+}
+.tabla-asistencia td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #eef2f5;
+}
+.tabla-asistencia tr:last-child td { border-bottom: none; }
+.tabla-asistencia tr:hover td { background: #f5f8fb; }
+.tabla-asistencia td.col-centro { text-align: center; }
+
+/* Celda de asistencia: presente o falta */
+.celda-presente {
+  color: var(--exito);
+  font-size: 1rem;
+  font-weight: 700;
+}
+.celda-falta {
+  color: #c0c8d0;
+  font-size: 0.9rem;
+}
+.badge-faltas {
+  display: inline-block;
+  background: #fce8e8;
+  color: var(--error);
+  border-radius: 20px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ── Mensajes de Error / Alerta ────────────────────────────── */
+.alerta {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radio-sm);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+.alerta-error { background: #fce8e8; color: var(--error); border-left: 4px solid var(--error); }
+.alerta-exito { background: #e6f4ec; color: var(--exito); border-left: 4px solid var(--exito); }
+
+/* ── Login Page ────────────────────────────────────────────── */
+.login-bg {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--azul-oscuro) 0%, var(--azul-medio) 100%);
+}
+.login-card {
+  background: var(--blanco);
+  border-radius: var(--radio);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.login-logo {
+  width: 60px; height: 60px;
+  background: var(--azul-oscuro);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  font-size: 1.6rem;
+}
+.login-card h1 {
+  text-align: center;
+  font-size: 1.3rem;
+  color: var(--azul-oscuro);
+  margin-bottom: 0.25rem;
+}
+.login-card .subtitulo {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  margin-bottom: 1.75rem;
+}
+.login-card .btn-primario { width: 100%; justify-content: center; padding: 0.75rem; margin-top: 0.5rem; }
+
+/* ── Modal de Confirmación ─────────────────────────────────── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.activo { display: flex; }
+.modal-box {
+  background: var(--blanco);
+  border-radius: var(--radio);
+  padding: 2rem;
+  max-width: 340px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  text-align: center;
+}
+.modal-box h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--texto); }
+.modal-box p  { font-size: 0.9rem; color: var(--texto-suave); margin-bottom: 1.5rem; }
+.modal-acciones { display: flex; gap: 0.75rem; justify-content: center; }
+
+/* ── Modal de Agregar Grupo ────────────────────────────────── */
+.modal-opciones { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+.opcion-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--azul-claro);
+  border-radius: var(--radio-sm);
+  background: var(--blanco);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  color: var(--texto);
+  transition: all var(--transicion);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.opcion-btn:hover { border-color: var(--azul-oscuro); background: #f0f5fb; }
+.opcion-btn .opcion-icono {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--azul-claro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.opcion-btn .opcion-texto strong { display: block; font-size: 0.95rem; }
+.opcion-btn .opcion-texto small { color: var(--texto-suave); font-size: 0.8rem; }
+
+/* ── Animaciones suaves ────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.animate-in { animation: fadeInUp 0.35s ease both; }
+
+/* ── Responsivo ────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .container { padding: 1.25rem 1rem; }
+  .saludo { font-size: 1.5rem; }
+  .grupos-grid { gap: 1rem; }
+  .grupo-circulo { width: 72px; height: 72px; font-size: 1.1rem; }
+}

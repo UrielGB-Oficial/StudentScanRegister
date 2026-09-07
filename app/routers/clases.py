@@ -10,12 +10,16 @@ Este router maneja:
   6. POST /clases/profesores/{id}/eliminar -> Elimina un profesor
 """
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+import io
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+import openpyxl
 from sqlmodel import Session, select
 
 from app.database import get_session
+from app.dependencies import requiere_login
 from app.models import Alumno, Asistencia, Clase, Profesor, Sesion
 
 router = APIRouter()
@@ -30,6 +34,7 @@ templates = Jinja2Templates(directory="app/templates")
 def listar_clases(
     request: Request,
     session: Session = Depends(get_session),
+    _=Depends(requiere_login),
 ):
     # Consulta: SELECT * FROM clase
     clases = session.exec(select(Clase)).all()
@@ -38,9 +43,9 @@ def listar_clases(
     profesores = session.exec(select(Profesor)).all()
 
     return templates.TemplateResponse(
-        "clases.html",
-        {
-            "request": request,
+        request=request,
+        name="clases.html",
+        context={
             "clases": clases,
             "profesores": profesores,
         },
@@ -56,6 +61,7 @@ def crear_clase(
     nombre_clase: str = Form(...),
     profesor_id: int = Form(...),
     session: Session = Depends(get_session),
+    _=Depends(requiere_login),
 ):
     nueva_clase = Clase(
         nombre_clase=nombre_clase.strip(),
@@ -156,20 +162,77 @@ def crear_profesor(
 def eliminar_profesor(
     profesor_id: int,
     session: Session = Depends(get_session),
+    _=Depends(requiere_login),
 ):
     profesor = session.get(Profesor, profesor_id)
     if not profesor:
         raise HTTPException(status_code=404, detail="Profesor no encontrado")
 
-    # Si el profesor tiene clases asignadas, no permitimos borrarlo directamente
     stmt_clases = select(Clase).where(Clase.profesor_id == profesor_id)
     if session.exec(stmt_clases).first():
         raise HTTPException(
             status_code=400,
-            detail="No se puede eliminar el profesor porque tiene clases asignadas. Reasigna o elimina las clases primero.",
+            detail="No se puede eliminar el profesor porque tiene clases asignadas.",
         )
 
     session.delete(profesor)
     session.commit()
-
     return RedirectResponse(url="/clases", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# ─────────────────────────────────────────────────────────────
+# 7. Crear grupo + subir Excel en un solo paso
+# ─────────────────────────────────────────────────────────────
+@router.post("/nueva-con-excel")
+async def crear_clase_con_excel(
+    nombre_clase: str = Form(...),
+    archivo: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    _=Depends(requiere_login),
+):
+    # Buscar el profesor (solo hay uno)
+    profesor = session.exec(select(Profesor)).first()
+    if not profesor:
+        raise HTTPException(status_code=400, detail="No hay ningún profesor registrado. Registra al profesor primero.")
+
+    # Crear la clase
+    nueva_clase = Clase(nombre_clase=nombre_clase.strip(), profesor_id=profesor.id)
+    session.add(nueva_clase)
+    session.commit()
+    session.refresh(nueva_clase)
+
+    # Leer el Excel y registrar alumnos
+    contenido = await archivo.read()
+    wb = openpyxl.load_workbook(filename=io.BytesIO(contenido), data_only=True)
+    ws = wb.active
+
+    col_codigo, col_nombre = 1, 2
+    primera_fila = [str(cell.value or "").strip().lower() for cell in ws[1]]
+    for idx, val in enumerate(primera_fila, start=1):
+        if "cod" in val:
+            col_codigo = idx
+        elif "nom" in val or "alum" in val:
+            col_nombre = idx
+
+    for row in ws.iter_rows(min_row=2, values_only=False):
+        val_cod = row[col_codigo - 1].value if len(row) >= col_codigo else None
+        val_nom = row[col_nombre - 1].value if len(row) >= col_nombre else None
+        if val_cod is None or val_nom is None:
+            continue
+        codigo_str = str(val_cod).strip()
+        if codigo_str.endswith(".0"):
+            codigo_str = codigo_str[:-2]
+        nombre_str = str(val_nom).strip()
+        if not codigo_str or not nombre_str:
+            continue
+        stmt = select(Alumno).where(Alumno.codigo_alumno == codigo_str)
+        alumno_db = session.exec(stmt).first()
+        if alumno_db:
+            alumno_db.nombre_alumno = nombre_str
+            alumno_db.clase_id = nueva_clase.id
+            session.add(alumno_db)
+        else:
+            session.add(Alumno(codigo_alumno=codigo_str, nombre_alumno=nombre_str, clase_id=nueva_clase.id))
+
+    session.commit()
+    return RedirectResponse(url=f"/clases/{nueva_clase.id}/asistencia", status_code=status.HTTP_303_SEE_OTHER)

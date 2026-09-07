@@ -1,0 +1,16 @@
+[Unit]
+Description=Lector USB de Codigo de Barras - StudentScanRegister
+After=registro.service
+Wants=registro.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/StudentScanRegister
+ExecStart=/home/pi/StudentScanRegister/venv/bin/python scanner/lector.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

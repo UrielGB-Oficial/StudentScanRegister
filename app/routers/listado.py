@@ -42,9 +42,9 @@ def ver_alumnos(
     alumnos = session.exec(stmt_alumnos).all()
 
     return templates.TemplateResponse(
-        "alumnos.html",
-        {
-            "request": request,
+        request=request,
+        name="alumnos.html",
+        context={
             "clase": clase,
             "alumnos": alumnos,
         },
@@ -222,11 +222,12 @@ def ver_matriz_asistencia(
         })
 
     return templates.TemplateResponse(
-        "asistencia.html",
-        {
-            "request": request,
+        request=request,
+        name="asistencia.html",
+        context={
             "clase": clase,
             "sesiones": sesiones,
             "filas": filas_asistencia,
+            "alumnos_total": len(alumnos),
         },
     )

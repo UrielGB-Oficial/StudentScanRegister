@@ -4,12 +4,17 @@
 #   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 
+import os
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+
 from app.database import create_db_and_tables
 from app.routers import asistencias, clases, listado
+from app.routers import auth
 
 
 # ─────────────────────────────────────────────────────────────
@@ -34,6 +39,13 @@ app = FastAPI(
     description="Taller de Redes — Registro via lector de código de barras",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+# SessionMiddleware habilita request.session (como $_SESSION en PHP).
+# secret_key se usa para firmar/cifrar la cookie — cámbiala en producción.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "cambia-esta-clave-en-produccion"),
 )
 
 
@@ -72,6 +84,12 @@ app.include_router(
     asistencias.router,
     prefix="/api",
     tags=["Asistencias / Lector"],
+)
+
+# Router de autenticación (login/logout) — sin prefijo
+app.include_router(
+    auth.router,
+    tags=["Autenticación"],
 )
 
 

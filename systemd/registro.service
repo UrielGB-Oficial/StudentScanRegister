@@ -1,0 +1,15 @@
+[Unit]
+Description=Servidor FastAPI - StudentScanRegister (Taller de Redes)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/StudentScanRegister
+ExecStart=/home/pi/StudentScanRegister/venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

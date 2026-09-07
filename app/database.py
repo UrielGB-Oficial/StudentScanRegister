@@ -24,6 +24,14 @@ engine = create_engine(
 # ─────────────────────────────────────────────
 def create_db_and_tables() -> None:
     SQLModel.metadata.create_all(engine)
+    from app.models import Profesor
+    from sqlmodel import select
+
+    with Session(engine) as session:
+        profesor = session.exec(select(Profesor)).first()
+        if not profesor:
+            session.add(Profesor(codigo_profesor="2201852", nombre_profesor="Horacio"))
+            session.commit()
 
 
 # ─────────────────────────────────────────────

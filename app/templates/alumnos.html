@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block titulo %}Alumnos: {{ clase.nombre_clase }} — Taller de Redes{% endblock %}
+
+{% block contenido %}
+
+  <div class="page-header animate-in">
+    <a href="/clases/{{ clase.id }}/asistencia" style="color:var(--azul-medio); font-size:0.85rem; text-decoration:none;">
+      ← Ver asistencias
+    </a>
+    <h1>Alumnos — {{ clase.nombre_clase }}</h1>
+    <p>{{ alumnos | length }} alumno(s) registrado(s)</p>
+  </div>
+
+  {# ── Acciones superiores ── #}
+  <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;" class="animate-in">
+    <button class="btn btn-primario" id="btn-subir-excel">📄 Subir lista Excel</button>
+    <button class="btn btn-secundario" id="btn-agregar-uno">➕ Agregar alumno</button>
+  </div>
+
+  {# ── Tabla de Alumnos ── #}
+  {% if alumnos %}
+    <div class="tabla-wrapper animate-in">
+      <table class="tabla-asistencia">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nombre del Alumno</th>
+            <th style="text-align:center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alumno in alumnos %}
+            <tr>
+              <td style="font-size:0.85rem; color:var(--texto-suave);">{{ alumno.codigo_alumno }}</td>
+              <td>{{ alumno.nombre_alumno }}</td>
+              <td style="text-align:center;">
+                <form method="POST" action="/clases/{{ clase.id }}/alumnos/{{ alumno.id }}/eliminar"
+                      onsubmit="return confirm('¿Eliminar a {{ alumno.nombre_alumno }}?')">
+                  <button type="submit" class="btn-icono btn-icono-borrar" title="Eliminar alumno">🗑️</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card animate-in" style="text-align:center; padding:3rem 2rem;">
+      <div style="font-size:3rem; margin-bottom:1rem;">👥</div>
+      <h3 style="color:var(--texto-suave);">Sin alumnos registrados</h3>
+      <p style="color:var(--texto-suave); margin-top:0.5rem;">
+        Sube un archivo Excel o agrega alumnos uno por uno.
+      </p>
+    </div>
+  {% endif %}
+
+
+  {# ══════════════════════════════════════════════════════════
+     MODAL: Subir Excel
+     ══════════════════════════════════════════════════════════ #}
+  <div class="modal-overlay" id="modal-excel">
+    <div class="modal-box animate-in">
+      <h3>Subir lista de alumnos</h3>
+      <p>Selecciona un archivo Excel (.xlsx) con columnas <strong>codigo</strong> y <strong>nombre</strong>.</p>
+      <form method="POST" action="/clases/{{ clase.id }}/alumnos/upload"
+            enctype="multipart/form-data" style="margin-top:1rem;">
+        <div class="form-group">
+          <label for="archivo">Archivo Excel</label>
+          <input id="archivo" name="archivo" type="file" accept=".xlsx,.xlsm" required />
+        </div>
+        <div class="modal-acciones">
+          <button type="button" class="btn btn-secundario" id="btn-cancelar-excel">Cancelar</button>
+          <button type="submit" class="btn btn-primario">Subir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════
+     MODAL: Agregar alumno individual
+     ══════════════════════════════════════════════════════════ #}
+  <div class="modal-overlay" id="modal-agregar">
+    <div class="modal-box animate-in">
+      <h3>Agregar alumno</h3>
+      <form method="POST" action="/clases/{{ clase.id }}/alumnos" style="margin-top:1rem;">
+        <div class="form-group">
+          <label for="codigo_alumno">Código (número de control)</label>
+          <input id="codigo_alumno" name="codigo_alumno" type="text"
+                 placeholder="Ej. 2201234" maxlength="20" required />
+        </div>
+        <div class="form-group">
+          <label for="nombre_alumno">Nombre completo</label>
+          <input id="nombre_alumno" name="nombre_alumno" type="text"
+                 placeholder="Ej. María López García" required />
+        </div>
+        <div class="modal-acciones">
+          <button type="button" class="btn btn-secundario" id="btn-cancelar-agregar">Cancelar</button>
+          <button type="submit" class="btn btn-primario">Agregar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  // Modal Subir Excel
+  const modalExcel = document.getElementById('modal-excel');
+  document.getElementById('btn-subir-excel').addEventListener('click', () => modalExcel.classList.add('activo'));
+  document.getElementById('btn-cancelar-excel').addEventListener('click', () => modalExcel.classList.remove('activo'));
+  modalExcel.addEventListener('click', (e) => { if (e.target === modalExcel) modalExcel.classList.remove('activo'); });
+
+  // Modal Agregar Alumno
+  const modalAgregar = document.getElementById('modal-agregar');
+  document.getElementById('btn-agregar-uno').addEventListener('click', () => modalAgregar.classList.add('activo'));
+  document.getElementById('btn-cancelar-agregar').addEventListener('click', () => modalAgregar.classList.remove('activo'));
+  modalAgregar.addEventListener('click', (e) => { if (e.target === modalAgregar) modalAgregar.classList.remove('activo'); });
+</script>
+{% endblock %}
