@@ -5,15 +5,21 @@
 {% block contenido %}
 
   <div class="page-header animate-in">
-    <a href="/clases/{{ clase.id }}/asistencia" style="color:var(--azul-medio); font-size:0.85rem; text-decoration:none;">
-      ← Ver asistencias
-    </a>
+    <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+      <a href="/clases/{{ clase.id }}/asistencia" class="btn btn-secundario" style="padding:0.35rem 0.85rem; font-size:0.85rem;">
+        ← Volver a asistencias
+      </a>
+      <span style="color:var(--texto-suave); font-size:0.85rem;">/ Mis Grupos / {{ clase.nombre_clase }} / Alumnos</span>
+    </div>
     <h1>Alumnos — {{ clase.nombre_clase }}</h1>
     <p>{{ alumnos | length }} alumno(s) registrado(s)</p>
   </div>
 
   {# ── Acciones superiores ── #}
   <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;" class="animate-in">
+    <a href="/clases/{{ clase.id }}/asistencia" class="btn btn-secundario" style="font-weight:600;">
+      ← Regresar
+    </a>
     <button class="btn btn-primario" id="btn-subir-excel">📄 Subir lista Excel</button>
     <button class="btn btn-secundario" id="btn-agregar-uno">➕ Agregar alumno</button>
   </div>
@@ -35,10 +41,10 @@
               <td style="font-size:0.85rem; color:var(--texto-suave);">{{ alumno.codigo_alumno }}</td>
               <td>{{ alumno.nombre_alumno }}</td>
               <td style="text-align:center;">
-                <form method="POST" action="/clases/{{ clase.id }}/alumnos/{{ alumno.id }}/eliminar"
-                      onsubmit="return confirm('¿Eliminar a {{ alumno.nombre_alumno }}?')">
-                  <button type="submit" class="btn-icono btn-icono-borrar" title="Eliminar alumno">🗑️</button>
-                </form>
+                <button type="button" class="btn-icono btn-icono-borrar" title="Eliminar alumno"
+                        onclick="abrirModalEliminarAlumno('{{ alumno.id }}', '{{ alumno.nombre_alumno }}')">
+                  🗑️
+                </button>
               </td>
             </tr>
           {% endfor %}
@@ -103,6 +109,25 @@
     </div>
   </div>
 
+
+  {# ══════════════════════════════════════════════════════════
+     MODAL: Confirmación de Eliminar Alumno
+     ══════════════════════════════════════════════════════════ #}
+  <div class="modal-overlay" id="modal-eliminar-alumno">
+    <div class="modal-box animate-in">
+      <h3>¿Eliminar alumno?</h3>
+      <p>
+        ¿Estás seguro de que deseas eliminar a <strong id="nombre-alumno-eliminar"></strong>? Esta acción borrará también sus asistencias registradas.
+      </p>
+      <div class="modal-acciones">
+        <button type="button" class="btn btn-secundario" id="btn-cancelar-eliminar-alumno">Cancelar</button>
+        <form id="form-eliminar-alumno" method="POST" action="">
+          <button type="submit" class="btn btn-peligro">Sí, eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
 {% endblock %}
 
 
@@ -119,5 +144,22 @@
   document.getElementById('btn-agregar-uno').addEventListener('click', () => modalAgregar.classList.add('activo'));
   document.getElementById('btn-cancelar-agregar').addEventListener('click', () => modalAgregar.classList.remove('activo'));
   modalAgregar.addEventListener('click', (e) => { if (e.target === modalAgregar) modalAgregar.classList.remove('activo'); });
+
+  // Modal Confirmar Eliminar Alumno
+  const modalEliminarAlumno = document.getElementById('modal-eliminar-alumno');
+  const formEliminarAlumno = document.getElementById('form-eliminar-alumno');
+  const spanNombreAlumno = document.getElementById('nombre-alumno-eliminar');
+  const btnCancelarEliminar = document.getElementById('btn-cancelar-eliminar-alumno');
+
+  function abrirModalEliminarAlumno(alumnoId, nombreAlumno) {
+    spanNombreAlumno.textContent = nombreAlumno;
+    formEliminarAlumno.action = `/clases/{{ clase.id }}/alumnos/${alumnoId}/eliminar`;
+    modalEliminarAlumno.classList.add('activo');
+  }
+
+  btnCancelarEliminar.addEventListener('click', () => modalEliminarAlumno.classList.remove('activo'));
+  modalEliminarAlumno.addEventListener('click', (e) => {
+    if (e.target === modalEliminarAlumno) modalEliminarAlumno.classList.remove('activo');
+  });
 </script>
 {% endblock %}

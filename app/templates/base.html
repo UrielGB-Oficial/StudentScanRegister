@@ -15,16 +15,52 @@
     </a>
     <div class="nav-links">
       <a href="/clases">Mis Grupos</a>
-      <a href="/logout">Cerrar sesión</a>
+      <a href="#" id="btn-abrir-logout">Cerrar sesión</a>
     </div>
   </nav>
+
+  {# ── Modal de Confirmación para Cerrar Sesión ── #}
+  <div class="modal-overlay" id="modal-logout">
+    <div class="modal-box animate-in">
+      <h3>¿Cerrar sesión?</h3>
+      <p>¿Estás seguro de que deseas salir del panel de administración?</p>
+      <div class="modal-acciones">
+        <button type="button" class="btn btn-secundario" id="btn-cancelar-logout">Cancelar</button>
+        <a href="/logout" class="btn btn-peligro">Sí, cerrar sesión</a>
+      </div>
+    </div>
+  </div>
 
   {# ── Contenido principal — cada plantilla lo define ── #}
   <main class="container">
     {% block contenido %}{% endblock %}
   </main>
 
-  {# ── Scripts compartidos ── #}
+  {# ── Script global para modal de logout ── #}
+  <script>
+    const modalLogout = document.getElementById('modal-logout');
+    const btnAbrirLogout = document.getElementById('btn-abrir-logout');
+    const btnCancelarLogout = document.getElementById('btn-cancelar-logout');
+
+    if (btnAbrirLogout && modalLogout) {
+      btnAbrirLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        modalLogout.classList.add('activo');
+      });
+    }
+    if (btnCancelarLogout && modalLogout) {
+      btnCancelarLogout.addEventListener('click', () => {
+        modalLogout.classList.remove('activo');
+      });
+    }
+    if (modalLogout) {
+      modalLogout.addEventListener('click', (e) => {
+        if (e.target === modalLogout) modalLogout.classList.remove('activo');
+      });
+    }
+  </script>
+
+  {# ── Scripts específicos de cada plantilla ── #}
   {% block scripts %}{% endblock %}
 
 </body>
