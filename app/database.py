@@ -1,13 +1,21 @@
 # database.py — Conexión a la base de datos SQLite
 
+from collections.abc import Generator
 from pathlib import Path
+
 from sqlmodel import Session, SQLModel, create_engine
 
 # ─────────────────────────────────────────────
 # Ruta del archivo de base de datos
 # ─────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
-DATABASE_URL = f"sqlite:///{BASE_DIR / 'data' / 'registro.db'}"
+DATA_DIR = BASE_DIR / "data"
+
+# Aseguramos que la carpeta data exista para evitar OperationalError de SQLite
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# as_posix() convierte barras invertidas de Windows a / para SQLite URL estándar
+DATABASE_URL = f"sqlite:///{(DATA_DIR / 'registro.db').as_posix()}"
 
 # ─────────────────────────────────────────────
 # Motor de base de datos
@@ -23,10 +31,14 @@ engine = create_engine(
 # Crear tablas
 # ─────────────────────────────────────────────
 def create_db_and_tables() -> None:
-    SQLModel.metadata.create_all(engine)
+    # 1. Importamos modelos ANTES de create_all para que SQLModel los registre en metadata
     from app.models import Profesor
     from sqlmodel import select
 
+    # 2. Crea las tablas si no existen
+    SQLModel.metadata.create_all(engine)
+
+    # 3. Semilla inicial: Horacio como profesor único por defecto
     with Session(engine) as session:
         profesor = session.exec(select(Profesor)).first()
         if not profesor:
@@ -37,6 +49,6 @@ def create_db_and_tables() -> None:
 # ─────────────────────────────────────────────
 # Sesión de base de datos (para los endpoints)
 # ─────────────────────────────────────────────
-def get_session():
+def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session

@@ -46,7 +46,7 @@ class Alumno(SQLModel, table=True):
 class Sesion(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     clase_id: int = Field(foreign_key="clase.id")
-    fecha: date = Field()
+    fecha: date = Field(default_factory=date.today)
     clase: Optional[Clase] = Relationship(back_populates="sesiones")
     asistencias: list["Asistencia"] = Relationship(back_populates="sesion")
 

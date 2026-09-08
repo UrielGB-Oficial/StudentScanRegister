@@ -12,10 +12,15 @@ Este router maneja:
 
 import io
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+# pyrefly: ignore [missing-import]
 from fastapi.responses import RedirectResponse
+# pyrefly: ignore [missing-import]
 from fastapi.templating import Jinja2Templates
+# pyrefly: ignore [missing-import]
 import openpyxl
+# pyrefly: ignore [missing-import]
 from sqlmodel import Session, select
 
 from app.database import get_session
