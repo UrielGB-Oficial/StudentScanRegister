@@ -3,7 +3,8 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlmodel import Session, SQLModel, create_engine
+# pyrefly: ignore [missing-import]
+from sqlmodel import Session, SQLModel, create_engine, select
 
 # ─────────────────────────────────────────────
 # Ruta del archivo de base de datos
@@ -31,9 +32,8 @@ engine = create_engine(
 # Crear tablas
 # ─────────────────────────────────────────────
 def create_db_and_tables() -> None:
-    # 1. Importamos modelos ANTES de create_all para que SQLModel los registre en metadata
+    # 1. Importamos modelos para que SQLModel registre sus tablas en metadata
     from app.models import Profesor
-    from sqlmodel import select
 
     # 2. Crea las tablas si no existen
     SQLModel.metadata.create_all(engine)
