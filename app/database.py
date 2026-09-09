@@ -38,7 +38,18 @@ def create_db_and_tables() -> None:
     # 2. Crea las tablas si no existen
     SQLModel.metadata.create_all(engine)
 
-    # 3. Semilla inicial: Horacio como profesor único por defecto
+    # 3. Migración automática de columnas para bases de datos existentes
+    with engine.connect() as conn:
+        cursor = conn.connection.cursor()
+        columnas_clase = [col[1] for col in cursor.execute("PRAGMA table_info(clase)").fetchall()]
+        if columnas_clase:
+            if "grado" not in columnas_clase:
+                cursor.execute("ALTER TABLE clase ADD COLUMN grado VARCHAR(10)")
+            if "ciclo" not in columnas_clase:
+                cursor.execute("ALTER TABLE clase ADD COLUMN ciclo VARCHAR(20)")
+            conn.connection.commit()
+
+    # 4. Semilla inicial: Horacio como profesor único por defecto
     with Session(engine) as session:
         profesor = session.exec(select(Profesor)).first()
         if not profesor:

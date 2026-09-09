@@ -4,140 +4,190 @@
 
 {% block contenido %}
 
-  <div class="page-header animate-in">
-    <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
-      <a href="/clases/{{ clase.id }}/asistencia" class="btn btn-secundario" style="padding:0.35rem 0.85rem; font-size:0.85rem;">
-        ← Volver a asistencias
-      </a>
-      <span style="color:var(--texto-suave); font-size:0.85rem;">/ Mis Grupos / {{ clase.nombre_clase }} / Alumnos</span>
-    </div>
-    <h1>Alumnos — {{ clase.nombre_clase }}</h1>
-    <p>{{ alumnos | length }} alumno(s) registrado(s)</p>
-  </div>
-
-  {# ── Acciones superiores ── #}
-  <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;" class="animate-in">
-    <a href="/clases/{{ clase.id }}/asistencia" class="btn btn-secundario" style="font-weight:600;">
-      ← Regresar
+<div class="page-header animate-in">
+  <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+    <a href="/clases/{{ clase.id }}/asistencia" class="btn btn-secundario"
+      style="padding:0.35rem 0.85rem; font-size:0.85rem;">
+      ← Volver a asistencias
     </a>
-    <button class="btn btn-primario" id="btn-subir-excel">📄 Subir lista Excel</button>
-    <button class="btn btn-secundario" id="btn-agregar-uno">➕ Agregar alumno</button>
+    <span style="color:var(--texto-suave); font-size:0.85rem;">/ Mis Grupos / {{ clase.nombre_clase }} / Alumnos</span>
   </div>
+  <h1>Alumnos — {{ clase.nombre_clase }}</h1>
+  <p>
+    {{ alumnos | length }} alumno(s) registrado(s)
+    {% if clase.grado or clase.ciclo %}
+    · <span class="badge-meta">{% if clase.grado %}{{ clase.grado }}{% endif %}{% if clase.grado and clase.ciclo %} · {%
+      endif %}{% if clase.ciclo %}{{ clase.ciclo }}{% endif %}</span>
+    {% endif %}
+  </p>
+</div>
 
-  {# ── Tabla de Alumnos ── #}
-  {% if alumnos %}
-    <div class="tabla-wrapper animate-in">
-      <table class="tabla-asistencia">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Nombre del Alumno</th>
-            <th style="text-align:center;">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for alumno in alumnos %}
-            <tr>
-              <td style="font-size:0.85rem; color:var(--texto-suave);">{{ alumno.codigo_alumno }}</td>
-              <td>{{ alumno.nombre_alumno }}</td>
-              <td style="text-align:center;">
-                <button type="button" class="btn-icono btn-icono-borrar" title="Eliminar alumno"
-                        onclick="abrirModalEliminarAlumno('{{ alumno.id }}', '{{ alumno.nombre_alumno }}')">
-                  🗑️
-                </button>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+{# ── Acciones superiores ── #}
+<div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;" class="animate-in">
+  <a href="/clases/{{ clase.id }}/asistencia" class="btn btn-secundario" style="font-weight:600;">
+    ← Regresar
+  </a>
+  <button class="btn btn-primario" id="btn-subir-excel">📄 Subir lista Excel</button>
+  <button class="btn btn-secundario" id="btn-agregar-uno">➕ Agregar alumno</button>
+</div>
+
+{# ── Tabla de Alumnos ── #}
+{% if alumnos %}
+<div class="tabla-wrapper animate-in">
+  <table class="tabla-asistencia">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Nombre del Alumno</th>
+        <th style="text-align:center;">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for alumno in alumnos %}
+      <tr>
+        <td style="font-size:0.85rem; color:var(--texto-suave);">{{ alumno.codigo_alumno }}</td>
+        <td>{{ alumno.nombre_alumno }}</td>
+        <td style="text-align:center;">
+          <button type="button" class="btn-icono btn-icono-borrar" title="Eliminar alumno"
+            onclick="abrirModalEliminarAlumno('{{ alumno.id }}', '{{ alumno.nombre_alumno }}')">
+            🗑️
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card animate-in" style="text-align:center; padding:3rem 2rem;">
+  <div style="font-size:3rem; margin-bottom:1rem;">👥</div>
+  <h3 style="color:var(--texto-suave);">Sin alumnos registrados</h3>
+  <p style="color:var(--texto-suave); margin-top:0.5rem;">
+    Sube un archivo Excel (.xlsx), CSV (.csv) o agrega alumnos uno por uno.
+  </p>
+</div>
+{% endif %}
+
+
+{# ══════════════════════════════════════════════════════════
+MODAL: Subir Archivo Excel o CSV
+══════════════════════════════════════════════════════════ #}
+<div class="modal-overlay" id="modal-excel">
+  <div class="upload-modal animate-in">
+    <button type="button" class="upload-modal-close" id="btn-cerrar-x-excel" aria-label="Cerrar">✕</button>
+
+    <div class="upload-modal-header">
+      <h2 class="upload-modal-title">Subir lista de alumnos</h2>
+      <p class="upload-modal-subtitle">Importa alumnos desde un archivo Excel o CSV</p>
     </div>
-  {% else %}
-    <div class="card animate-in" style="text-align:center; padding:3rem 2rem;">
-      <div style="font-size:3rem; margin-bottom:1rem;">👥</div>
-      <h3 style="color:var(--texto-suave);">Sin alumnos registrados</h3>
-      <p style="color:var(--texto-suave); margin-top:0.5rem;">
-        Sube un archivo Excel o agrega alumnos uno por uno.
-      </p>
-    </div>
-  {% endif %}
 
+    <form method="POST" action="/clases/{{ clase.id }}/alumnos/upload" enctype="multipart/form-data">
 
-  {# ══════════════════════════════════════════════════════════
-     MODAL: Subir Excel
-     ══════════════════════════════════════════════════════════ #}
-  <div class="modal-overlay" id="modal-excel">
-    <div class="modal-box animate-in">
-      <h3>Subir lista de alumnos</h3>
-      <p>Selecciona un archivo Excel (.xlsx) con columnas <strong>codigo</strong> y <strong>nombre</strong>.</p>
-      <form method="POST" action="/clases/{{ clase.id }}/alumnos/upload"
-            enctype="multipart/form-data" style="margin-top:1rem;">
-        <div class="form-group">
-          <label for="archivo">Archivo Excel</label>
-          <input id="archivo" name="archivo" type="file" accept=".xlsx,.xlsm" required />
-        </div>
-        <div class="modal-acciones">
-          <button type="button" class="btn btn-secundario" id="btn-cancelar-excel">Cancelar</button>
-          <button type="submit" class="btn btn-primario">Subir</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-
-  {# ══════════════════════════════════════════════════════════
-     MODAL: Agregar alumno individual
-     ══════════════════════════════════════════════════════════ #}
-  <div class="modal-overlay" id="modal-agregar">
-    <div class="modal-box animate-in">
-      <h3>Agregar alumno</h3>
-      <form method="POST" action="/clases/{{ clase.id }}/alumnos" style="margin-top:1rem;">
-        <div class="form-group">
-          <label for="codigo_alumno">Código (número de control)</label>
-          <input id="codigo_alumno" name="codigo_alumno" type="text"
-                 placeholder="Ej. 2201234" maxlength="20" required />
-        </div>
-        <div class="form-group">
-          <label for="nombre_alumno">Nombre completo</label>
-          <input id="nombre_alumno" name="nombre_alumno" type="text"
-                 placeholder="Ej. María López García" required />
-        </div>
-        <div class="modal-acciones">
-          <button type="button" class="btn btn-secundario" id="btn-cancelar-agregar">Cancelar</button>
-          <button type="submit" class="btn btn-primario">Agregar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-
-  {# ══════════════════════════════════════════════════════════
-     MODAL: Confirmación de Eliminar Alumno
-     ══════════════════════════════════════════════════════════ #}
-  <div class="modal-overlay" id="modal-eliminar-alumno">
-    <div class="modal-box animate-in">
-      <h3>¿Eliminar alumno?</h3>
-      <p>
-        ¿Estás seguro de que deseas eliminar a <strong id="nombre-alumno-eliminar"></strong>? Esta acción borrará también sus asistencias registradas.
-      </p>
-      <div class="modal-acciones">
-        <button type="button" class="btn btn-secundario" id="btn-cancelar-eliminar-alumno">Cancelar</button>
-        <form id="form-eliminar-alumno" method="POST" action="">
-          <button type="submit" class="btn btn-peligro">Sí, eliminar</button>
-        </form>
+      <div class="upload-zone" id="upload-zone-alumnos">
+        <span class="upload-zone-icon">📄</span>
+        <p class="upload-zone-hint">Haz clic para seleccionar<br>tu archivo Excel o CSV</p>
+        <button type="button" class="btn-upload-select" id="btn-browse-alumnos">
+          ⬆ Seleccionar archivo
+        </button>
+        <input id="archivo_input_alumnos" name="archivo" type="file" accept=".xlsx,.xlsm,.csv" style="display:none;"
+          required />
+        <p class="upload-zone-filename" id="file-name-text-alumnos"></p>
       </div>
+      <p class="upload-formats">Formatos aceptados: .xlsx · .csv</p>
+
+      <div class="upload-modal-actions">
+        <button type="button" class="btn btn-secundario" id="btn-cancelar-excel">Cancelar</button>
+        <button type="submit" class="btn btn-primario">Subir</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════════════════════
+MODAL: Agregar alumno individual
+══════════════════════════════════════════════════════════ #}
+<div class="modal-overlay" id="modal-agregar">
+  <div class="modal-box animate-in">
+    <h3>Agregar alumno</h3>
+    <form method="POST" action="/clases/{{ clase.id }}/alumnos" style="margin-top:1rem; text-align:left;">
+      <div class="form-group">
+        <label for="codigo_alumno">Código (número de control)</label>
+        <input id="codigo_alumno" name="codigo_alumno" type="text" placeholder="Ej. 2201234" maxlength="20" required />
+      </div>
+      <div class="form-group">
+        <label for="nombre_alumno">Nombre completo</label>
+        <input id="nombre_alumno" name="nombre_alumno" type="text" placeholder="Ej. María López García" required />
+      </div>
+      <div class="modal-acciones" style="margin-top:1.25rem;">
+        <button type="button" class="btn btn-secundario" id="btn-cancelar-agregar">Cancelar</button>
+        <button type="submit" class="btn btn-primario">Agregar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
+{# ══════════════════════════════════════════════════════════
+MODAL: Confirmación de Eliminar Alumno
+══════════════════════════════════════════════════════════ #}
+<div class="modal-overlay" id="modal-eliminar-alumno">
+  <div class="modal-box animate-in">
+    <h3>¿Eliminar alumno?</h3>
+    <p>
+      ¿Estás seguro de que deseas eliminar a <strong id="nombre-alumno-eliminar"></strong>? Esta acción borrará también
+      sus asistencias registradas.
+    </p>
+    <div class="modal-acciones">
+      <button type="button" class="btn btn-secundario" id="btn-cancelar-eliminar-alumno">Cancelar</button>
+      <form id="form-eliminar-alumno" method="POST" action="">
+        <button type="submit" class="btn btn-peligro">Sí, eliminar</button>
+      </form>
     </div>
   </div>
+</div>
 
 {% endblock %}
 
 
 {% block scripts %}
 <script>
-  // Modal Subir Excel
+  // Modal Subir Archivo
   const modalExcel = document.getElementById('modal-excel');
-  document.getElementById('btn-subir-excel').addEventListener('click', () => modalExcel.classList.add('activo'));
-  document.getElementById('btn-cancelar-excel').addEventListener('click', () => modalExcel.classList.remove('activo'));
-  modalExcel.addEventListener('click', (e) => { if (e.target === modalExcel) modalExcel.classList.remove('activo'); });
+  const btnSubirExcel = document.getElementById('btn-subir-excel');
+  const btnCancelarExcel = document.getElementById('btn-cancelar-excel');
+  const btnCerrarXExcel = document.getElementById('btn-cerrar-x-excel');
+  const btnBrowseAlumnos = document.getElementById('btn-browse-alumnos');
+  const inputAlumnos = document.getElementById('archivo_input_alumnos');
+  const fileNameAlumnos = document.getElementById('file-name-text-alumnos');
+  const uploadZoneAlumnos = document.getElementById('upload-zone-alumnos');
+
+  function cerrarModalExcel() { modalExcel.classList.remove('activo'); resetFile(); }
+  btnSubirExcel.addEventListener('click', () => modalExcel.classList.add('activo'));
+  btnCancelarExcel.addEventListener('click', cerrarModalExcel);
+  btnCerrarXExcel.addEventListener('click', cerrarModalExcel);
+  modalExcel.addEventListener('click', (e) => { if (e.target === modalExcel) cerrarModalExcel(); });
+
+  btnBrowseAlumnos.addEventListener('click', () => inputAlumnos.click());
+
+  inputAlumnos.addEventListener('change', () => {
+    if (inputAlumnos.files && inputAlumnos.files.length > 0) {
+      fileNameAlumnos.textContent = '✅ ' + inputAlumnos.files[0].name;
+      uploadZoneAlumnos.classList.add('tiene-archivo');
+    } else {
+      resetFile();
+    }
+  });
+
+  function resetFile() {
+    inputAlumnos.value = '';
+    fileNameAlumnos.textContent = '';
+    uploadZoneAlumnos.classList.remove('tiene-archivo');
+  }
+
+
 
   // Modal Agregar Alumno
   const modalAgregar = document.getElementById('modal-agregar');

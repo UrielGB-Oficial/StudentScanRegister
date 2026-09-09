@@ -342,24 +342,27 @@ nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.48);
   z-index: 1000;
   align-items: center;
   justify-content: center;
+  padding: 1rem;
 }
 .modal-overlay.activo { display: flex; }
 .modal-box {
-  background: var(--blanco);
+  background: #ffffff;
   border-radius: var(--radio);
   padding: 2rem;
-  max-width: 340px;
-  width: 90%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.22);
   text-align: center;
+  position: relative;
 }
 .modal-box h3 { font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--texto); }
 .modal-box p  { font-size: 0.9rem; color: var(--texto-suave); margin-bottom: 1.5rem; }
 .modal-acciones { display: flex; gap: 0.75rem; justify-content: center; }
+
 
 /* ── Modal de Agregar Grupo ────────────────────────────────── */
 .modal-opciones { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
@@ -393,6 +396,189 @@ nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco
 .opcion-btn .opcion-texto strong { display: block; font-size: 0.95rem; }
 .opcion-btn .opcion-texto small { color: var(--texto-suave); font-size: 0.8rem; }
 
+/* ── Form Row (2 columnas: Grado y Ciclo) ───────────────────── */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+select.form-input,
+.form-group select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radio-sm);
+  font-size: 0.9rem;
+  background: var(--blanco);
+  color: var(--texto);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+select.form-input:focus,
+.form-group select:focus {
+  border-color: var(--azul-oscuro);
+}
+
+/* ── Badges de Grado y Ciclo ────────────────────────────────── */
+.grupo-badges {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 0.3rem;
+}
+.badge-meta {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: var(--azul-claro);
+  color: var(--azul-oscuro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ── Upload Modal — Diseño limpio con paleta de la app ─────── */
+.upload-modal {
+  position: relative;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 2rem 2rem 1.75rem;
+  box-shadow: 0 20px 60px rgba(51, 104, 160, 0.22);
+  width: 92%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.upload-modal-wide { max-width: 720px; }
+
+.upload-modal-close {
+  position: absolute;
+  top: 1rem; right: 1rem;
+  background: none;
+  border: none;
+  color: var(--texto-suave);
+  font-size: 1.25rem;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+.upload-modal-close:hover { background: var(--azul-claro); color: var(--azul-oscuro); }
+
+.upload-modal-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding: 0 1.5rem;
+}
+.upload-modal-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--azul-oscuro);
+  margin-bottom: 0.25rem;
+}
+.upload-modal-subtitle {
+  font-size: 0.88rem;
+  color: var(--texto-suave);
+}
+
+/* Grid 2 columnas para formulario con Excel */
+.upload-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Zona de subida */
+.upload-zone {
+  border: 2px dashed var(--azul-medio);
+  border-radius: 12px;
+  background: linear-gradient(145deg, #f0f6fb 0%, #e8f4f0 100%);
+  padding: 1.75rem 1.25rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.upload-zone:hover {
+  border-color: var(--azul-oscuro);
+  background: linear-gradient(145deg, #e4eef8 0%, #dff0ea 100%);
+  box-shadow: inset 0 0 0 3px rgba(51,104,160,0.07);
+}
+.upload-zone.tiene-archivo {
+  border-color: var(--exito);
+  background: linear-gradient(145deg, #edf7f0 0%, #e2f5ea 100%);
+  border-style: solid;
+}
+.upload-zone-icon { font-size: 2.25rem; display: block; margin-bottom: 0.6rem; }
+.upload-zone-hint {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+.upload-zone-filename {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--exito);
+  margin-top: 0.6rem;
+  word-break: break-all;
+  min-height: 1.1em;
+}
+.btn-upload-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--azul-oscuro);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.3rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 6px rgba(51,104,160,0.25);
+}
+.btn-upload-select:hover {
+  background: #274e7a;
+  box-shadow: 0 4px 10px rgba(51,104,160,0.35);
+}
+.upload-formats {
+  font-size: 0.75rem;
+  color: var(--texto-suave);
+  text-align: center;
+  margin-top: 0.5rem;
+}
+.upload-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--azul-claro);
+}
+
+/* Estilos compatibles heredados */
+.modal-wireframe .modal-close {
+  position: absolute;
+  top: 1rem; right: 1rem;
+  background: none; border: none;
+  font-size: 1.25rem;
+  color: var(--texto-suave);
+  cursor: pointer;
+  border-radius: 50%;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.modal-wireframe .modal-close:hover { background: var(--azul-claro); color: var(--azul-oscuro); }
+
+
 /* ── Animaciones suaves ────────────────────────────────────── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(16px); }
@@ -406,4 +592,12 @@ nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco
   .saludo { font-size: 1.5rem; }
   .grupos-grid { gap: 1rem; }
   .grupo-circulo { width: 72px; height: 72px; font-size: 1.1rem; }
+  .form-row { grid-template-columns: 1fr; }
+  .upload-form-grid { grid-template-columns: 1fr; }
+  .upload-modal-wide { max-width: 96vw; }
 }
+
+
+
+
+

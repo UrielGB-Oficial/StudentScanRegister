@@ -16,16 +16,22 @@ class Profesor(SQLModel, table=True):
     clases: list["Clase"] = Relationship(back_populates="profesor")
 
 
+GRADOS_VALIDOS = ["1ro", "2do", "3ro", "4to", "5to", "6to", "7mo", "8vo", "9no"]
+
+
 # ─────────────────────────────────────────────
 # CLASE
 # ─────────────────────────────────────────────
 class Clase(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre_clase: str = Field(max_length=100)
+    grado: Optional[str] = Field(default=None, max_length=10)
+    ciclo: Optional[str] = Field(default=None, max_length=20)
     profesor_id: int = Field(foreign_key="profesor.id")
     profesor: Optional[Profesor] = Relationship(back_populates="clases")
     alumnos: list["Alumno"] = Relationship(back_populates="clase")
     sesiones: list["Sesion"] = Relationship(back_populates="clase")
+
 
 
 # ─────────────────────────────────────────────

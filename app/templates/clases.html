@@ -14,10 +14,15 @@
     {% for clase in clases %}
       <a class="grupo-card" href="/clases/{{ clase.id }}/asistencia" title="Ver asistencias de {{ clase.nombre_clase }}">
         <div class="grupo-circulo">
-          {# Mostramos solo las primeras letras del nombre, ej. "R1" para "Redes 1" #}
           {{ clase.nombre_clase[:2].upper() }}
         </div>
         <span class="grupo-nombre">{{ clase.nombre_clase }}</span>
+        {% if clase.grado or clase.ciclo %}
+          <div class="grupo-badges">
+            {% if clase.grado %}<span class="badge-meta">{{ clase.grado }}</span>{% endif %}
+            {% if clase.ciclo %}<span class="badge-meta">{{ clase.ciclo }}</span>{% endif %}
+          </div>
+        {% endif %}
       </a>
     {% endfor %}
 
@@ -38,87 +43,152 @@
 
 
   {# ══════════════════════════════════════════════════════════
-     MODAL: Opciones para Agregar Grupo
-     Aparece cuando el usuario hace clic en el botón "+".
-     Dos opciones: Subir lista Excel  |  Crear de cero
+     MODAL 1: Elegir cómo agregar el grupo
      ══════════════════════════════════════════════════════════ #}
   <div class="modal-overlay" id="modal-agregar-grupo">
-    <div class="modal-box animate-in">
-      <h3>Agregar grupo</h3>
-      <p>¿Cómo quieres registrar a los alumnos?</p>
+    <div class="modal-box" style="max-width:400px; text-align:left;">
+      <button type="button" class="upload-modal-close" id="btn-cerrar-x-grupo" aria-label="Cerrar">✕</button>
+      <h3 style="font-size:1.25rem; font-weight:700; margin-bottom:0.3rem; color:var(--azul-oscuro);">Agregar grupo</h3>
+      <p style="color:var(--texto-suave); font-size:0.88rem; margin-bottom:1.25rem;">¿Cómo quieres registrar a los alumnos?</p>
 
       <div class="modal-opciones">
 
-        {# Opción 1: Subir lista Excel #}
         <button class="opcion-btn" id="btn-subir-lista">
           <div class="opcion-icono">📄</div>
           <div class="opcion-texto">
             <strong>Subir lista</strong>
-            <small>Importar alumnos desde un archivo Excel (.xlsx)</small>
+            <small>Importar alumnos desde archivo Excel (.xlsx) o CSV (.csv)</small>
           </div>
         </button>
 
-        {# Opción 2: Crear desde cero #}
         <button class="opcion-btn" id="btn-crear-cero">
           <div class="opcion-icono">✏️</div>
           <div class="opcion-texto">
             <strong>Crear de cero</strong>
-            <small>Ingresar el nombre del grupo manualmente</small>
+            <small>Ingresar los datos del grupo manualmente</small>
           </div>
         </button>
 
       </div>
 
-      {# ── Sub-formulario: Subir Excel ── (oculto por defecto) #}
-      <div id="form-subir-lista" style="display:none; margin-top:1.25rem;">
-        <form method="POST" action="/clases/nueva-con-excel" enctype="multipart/form-data">
-          <div class="form-group">
-            <label for="nombre_clase_excel">Nombre del grupo</label>
-            <input id="nombre_clase_excel" name="nombre_clase" type="text"
-                   placeholder="Ej. Redes 1, Redes 3…" required />
-          </div>
-          <div class="form-group">
-            <label for="archivo_excel">Archivo Excel (.xlsx)</label>
-            <input id="archivo_excel" name="archivo" type="file" accept=".xlsx,.xlsm" required />
-          </div>
-          <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
-            <button type="submit" class="btn btn-primario">Subir lista</button>
-            <button type="button" class="btn btn-secundario" id="btn-cancelar-excel">Cancelar</button>
-          </div>
-        </form>
-      </div>
-
-      {# ── Sub-formulario: Crear de cero ── (oculto por defecto) #}
-      <div id="form-crear-cero" style="display:none; margin-top:1.25rem;">
-        <form method="POST" action="/clases">
-          {# El ID del profesor es fijo (solo hay un profesor) — se envía oculto #}
-          {% if profesores %}
-            <input type="hidden" name="profesor_id" value="{{ profesores[0].id }}" />
-          {% endif %}
-          <div class="form-group">
-            <label for="nombre_clase_manual">Nombre del grupo</label>
-            <input id="nombre_clase_manual" name="nombre_clase" type="text"
-                   placeholder="Ej. Redes 1, Redes 3…" required />
-          </div>
-          <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
-            <button type="submit" class="btn btn-primario">Crear grupo</button>
-            <button type="button" class="btn btn-secundario" id="btn-cancelar-manual">Cancelar</button>
-          </div>
-        </form>
-      </div>
-
-      {# Botón de cerrar modal (cuando aún no elegiste opción) #}
-      <div id="btn-cerrar-modal-wrapper" style="margin-top:1rem; text-align:right;">
+      <div style="display:flex; justify-content:flex-end; margin-top:1.25rem;">
         <button class="btn btn-secundario" id="btn-cerrar-modal">Cancelar</button>
       </div>
-
     </div>
   </div>
 
 
   {# ══════════════════════════════════════════════════════════
-     MODAL: Confirmación de eliminación de grupo
-     Se activa desde los botones de eliminar de cada clase
+     MODAL 2: Subir lista Excel (2 columnas)
+     ══════════════════════════════════════════════════════════ #}
+  <div class="modal-overlay" id="modal-subir-excel-clase">
+    <div class="upload-modal upload-modal-wide">
+      <button type="button" class="upload-modal-close" id="btn-cerrar-excel-clase" aria-label="Cerrar">✕</button>
+
+      <div class="upload-modal-header">
+        <h2 class="upload-modal-title">Subir lista de alumnos</h2>
+        <p class="upload-modal-subtitle">Importa alumnos desde un archivo Excel o CSV</p>
+      </div>
+
+      <form method="POST" action="/clases/nueva-con-excel" enctype="multipart/form-data">
+
+        <div class="upload-form-grid">
+
+          {# Columna izquierda: campos del grupo #}
+          <div>
+            <div class="form-group">
+              <label for="nombre_clase_excel">Nombre del grupo</label>
+              <input id="nombre_clase_excel" name="nombre_clase" type="text"
+                     placeholder="Ej. Sistemas Operativos, Redes 1…" required />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="grado_excel">Grado</label>
+                <select id="grado_excel" name="grado" required>
+                  <option value="" disabled selected>Selecciona grado</option>
+                  {% for g in grados %}
+                    <option value="{{ g }}">{{ g }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="ciclo_excel">Ciclo</label>
+                <input id="ciclo_excel" name="ciclo" type="text" value="{{ ciclo_actual }}"
+                       placeholder="Ej. 2026B" required />
+              </div>
+            </div>
+          </div>
+
+          {# Columna derecha: zona de archivo #}
+          <div>
+            <div class="upload-zone" id="upload-zone-clase">
+              <span class="upload-zone-icon">📄</span>
+              <p class="upload-zone-hint">Haz clic para seleccionar<br>tu archivo Excel o CSV</p>
+              <button type="button" class="btn-upload-select" id="btn-browse-clase">
+                ⬆ Seleccionar archivo
+              </button>
+              <input id="archivo_input_clase" name="archivo" type="file"
+                     accept=".xlsx,.xlsm,.csv" style="display:none;" required />
+              <p class="upload-zone-filename" id="file-name-text-clase"></p>
+            </div>
+            <p class="upload-formats">Formatos aceptados: .xlsx · .csv</p>
+          </div>
+
+        </div>
+
+        <div class="upload-modal-actions">
+          <button type="button" class="btn btn-secundario" id="btn-cancelar-excel-clase">Cancelar</button>
+          <button type="submit" class="btn btn-primario">Subir y crear grupo</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════
+     MODAL 3: Crear grupo de cero (manual)
+     ══════════════════════════════════════════════════════════ #}
+  <div class="modal-overlay" id="modal-crear-cero-clase">
+    <div class="modal-box" style="max-width:420px; text-align:left;">
+      <button type="button" class="upload-modal-close" id="btn-cerrar-crear-clase" aria-label="Cerrar">✕</button>
+      <h3 style="font-size:1.2rem; font-weight:700; margin-bottom:1.1rem; color:var(--azul-oscuro);">Crear grupo de cero</h3>
+      <form method="POST" action="/clases">
+        {% if profesores %}
+          <input type="hidden" name="profesor_id" value="{{ profesores[0].id }}" />
+        {% endif %}
+        <div class="form-group">
+          <label for="nombre_clase_manual">Nombre del grupo</label>
+          <input id="nombre_clase_manual" name="nombre_clase" type="text"
+                 placeholder="Ej. Sistemas Operativos, Redes 1…" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="grado_manual">Grado</label>
+            <select id="grado_manual" name="grado" required>
+              <option value="" disabled selected>Selecciona grado</option>
+              {% for g in grados %}
+                <option value="{{ g }}">{{ g }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="ciclo_manual">Ciclo</label>
+            <input id="ciclo_manual" name="ciclo" type="text" value="{{ ciclo_actual }}"
+                   placeholder="Ej. 2026B" required />
+          </div>
+        </div>
+        <div class="upload-modal-actions">
+          <button type="button" class="btn btn-secundario" id="btn-cancelar-crear">Cancelar</button>
+          <button type="submit" class="btn btn-primario">Crear grupo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  {# ══════════════════════════════════════════════════════════
+     MODAL 4: Confirmación de eliminación de grupo
      ══════════════════════════════════════════════════════════ #}
   <div class="modal-overlay" id="modal-confirmar-eliminar">
     <div class="modal-box">
@@ -136,44 +206,68 @@
 {% endblock %}
 
 
+
+
 {% block scripts %}
 <script>
-  // ── Modal de Agregar Grupo ──────────────────────────────────
-  const modalGrupo     = document.getElementById('modal-agregar-grupo');
-  const btnAbrir       = document.getElementById('btn-abrir-modal-grupo');
-  const btnCerrar      = document.getElementById('btn-cerrar-modal');
-  const formSubir      = document.getElementById('form-subir-lista');
-  const formManual     = document.getElementById('form-crear-cero');
-  const btnSubirLista  = document.getElementById('btn-subir-lista');
-  const btnCrearCero   = document.getElementById('btn-crear-cero');
-  const btnCerrarWrapper = document.getElementById('btn-cerrar-modal-wrapper');
+  // ── MODAL 1: Elegir opción ─────────────────────────────────
+  const modalGrupo   = document.getElementById('modal-agregar-grupo');
+  const btnAbrir     = document.getElementById('btn-abrir-modal-grupo');
+  const btnCerrar    = document.getElementById('btn-cerrar-modal');
+  const btnCerrarX1  = document.getElementById('btn-cerrar-x-grupo');
 
   btnAbrir.addEventListener('click', () => modalGrupo.classList.add('activo'));
-  btnCerrar.addEventListener('click', () => { modalGrupo.classList.remove('activo'); resetModal(); });
-  modalGrupo.addEventListener('click', (e) => { if (e.target === modalGrupo) { modalGrupo.classList.remove('activo'); resetModal(); } });
+  function cerrarModal1() { modalGrupo.classList.remove('activo'); }
+  btnCerrar.addEventListener('click', cerrarModal1);
+  btnCerrarX1.addEventListener('click', cerrarModal1);
+  modalGrupo.addEventListener('click', (e) => { if (e.target === modalGrupo) cerrarModal1(); });
 
-  btnSubirLista.addEventListener('click', () => {
-    formSubir.style.display = 'block';
-    formManual.style.display = 'none';
-    btnCerrarWrapper.style.display = 'none';
+  // ── MODAL 2: Subir Excel (2 columnas) ─────────────────────
+  const modalExcelClase  = document.getElementById('modal-subir-excel-clase');
+  const inputClase       = document.getElementById('archivo_input_clase');
+  const fileNameClase    = document.getElementById('file-name-text-clase');
+  const uploadZoneClase  = document.getElementById('upload-zone-clase');
+
+  document.getElementById('btn-subir-lista').addEventListener('click', () => {
+    cerrarModal1();
+    modalExcelClase.classList.add('activo');
   });
 
-  btnCrearCero.addEventListener('click', () => {
-    formManual.style.display = 'block';
-    formSubir.style.display = 'none';
-    btnCerrarWrapper.style.display = 'none';
-  });
-
-  document.getElementById('btn-cancelar-excel').addEventListener('click', resetModal);
-  document.getElementById('btn-cancelar-manual').addEventListener('click', resetModal);
-
-  function resetModal() {
-    formSubir.style.display = 'none';
-    formManual.style.display = 'none';
-    btnCerrarWrapper.style.display = 'block';
+  function cerrarModal2() {
+    modalExcelClase.classList.remove('activo');
+    inputClase.value = '';
+    fileNameClase.textContent = '';
+    uploadZoneClase.classList.remove('tiene-archivo');
   }
+  document.getElementById('btn-cancelar-excel-clase').addEventListener('click', cerrarModal2);
+  document.getElementById('btn-cerrar-excel-clase').addEventListener('click', cerrarModal2);
+  modalExcelClase.addEventListener('click', (e) => { if (e.target === modalExcelClase) cerrarModal2(); });
 
-  // ── Modal de Confirmación de Eliminar ──────────────────────
+  document.getElementById('btn-browse-clase').addEventListener('click', () => inputClase.click());
+  inputClase.addEventListener('change', () => {
+    if (inputClase.files && inputClase.files.length > 0) {
+      fileNameClase.textContent = '✅ ' + inputClase.files[0].name;
+      uploadZoneClase.classList.add('tiene-archivo');
+    } else {
+      fileNameClase.textContent = '';
+      uploadZoneClase.classList.remove('tiene-archivo');
+    }
+  });
+
+  // ── MODAL 3: Crear de cero ────────────────────────────────
+  const modalCrearClase = document.getElementById('modal-crear-cero-clase');
+
+  document.getElementById('btn-crear-cero').addEventListener('click', () => {
+    cerrarModal1();
+    modalCrearClase.classList.add('activo');
+  });
+
+  function cerrarModal3() { modalCrearClase.classList.remove('activo'); }
+  document.getElementById('btn-cancelar-crear').addEventListener('click', cerrarModal3);
+  document.getElementById('btn-cerrar-crear-clase').addEventListener('click', cerrarModal3);
+  modalCrearClase.addEventListener('click', (e) => { if (e.target === modalCrearClase) cerrarModal3(); });
+
+  // ── MODAL 4: Confirmación de Eliminar ─────────────────────
   const modalConfirmar = document.getElementById('modal-confirmar-eliminar');
   const formEliminar   = document.getElementById('form-eliminar-clase');
   const textoModal     = document.getElementById('modal-confirmar-texto');
@@ -182,7 +276,6 @@
     modalConfirmar.classList.remove('activo');
   });
 
-  // Esta función la llamamos desde cada botón de eliminar en las tarjetas
   function confirmarEliminar(claseId, nombreClase) {
     textoModal.textContent = `¿Eliminar el grupo "${nombreClase}" y todos sus registros de asistencia?`;
     formEliminar.action = `/clases/${claseId}/eliminar`;
@@ -190,3 +283,4 @@
   }
 </script>
 {% endblock %}
+

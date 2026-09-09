@@ -3,29 +3,23 @@ routers/clases.py — Gestión de Clases y Profesores (Panel de Administración)
 
 Este router maneja:
   1. GET  /clases                     -> Muestra la página principal con la lista de clases y profesores
-  2. POST /clases                     -> Crea una nueva clase
-  3. POST /clases/{clase_id}/editar   -> Actualiza el nombre o profesor de una clase
+  2. POST /clases                     -> Crea una nueva clase (manual con Nombre, Grado y Ciclo)
+  3. POST /clases/{clase_id}/editar   -> Actualiza el nombre, grado o ciclo de una clase
   4. POST /clases/{clase_id}/eliminar -> Elimina una clase y sus datos asociados
   5. POST /clases/profesores          -> Da de alta un profesor
   6. POST /clases/profesores/{id}/eliminar -> Elimina un profesor
+  7. POST /clases/nueva-con-excel     -> Crea grupo (Nombre, Grado, Ciclo) y sube lista (.xlsx, .csv)
 """
 
-import io
-
-# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-# pyrefly: ignore [missing-import]
 from fastapi.responses import RedirectResponse
-# pyrefly: ignore [missing-import]
 from fastapi.templating import Jinja2Templates
-# pyrefly: ignore [missing-import]
-import openpyxl
-# pyrefly: ignore [missing-import]
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.dependencies import requiere_login
-from app.models import Alumno, Asistencia, Clase, Profesor, Sesion
+from app.models import GRADOS_VALIDOS, Alumno, Asistencia, Clase, Profesor, Sesion
+from app.utils import obtener_ciclo_actual, procesar_archivo_alumnos
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -41,11 +35,9 @@ def listar_clases(
     session: Session = Depends(get_session),
     _=Depends(requiere_login),
 ):
-    # Consulta: SELECT * FROM clase
     clases = session.exec(select(Clase)).all()
-
-    # Consulta: SELECT * FROM profesor
     profesores = session.exec(select(Profesor)).all()
+    ciclo_actual = obtener_ciclo_actual()
 
     return templates.TemplateResponse(
         request=request,
@@ -53,29 +45,34 @@ def listar_clases(
         context={
             "clases": clases,
             "profesores": profesores,
+            "grados": GRADOS_VALIDOS,
+            "ciclo_actual": ciclo_actual,
         },
     )
 
 
 # ─────────────────────────────────────────────────────────────
-# 2. Crear una nueva Clase
+# 2. Crear una nueva Clase (Manual)
 # ─────────────────────────────────────────────────────────────
 @router.post("")
 @router.post("/")
 def crear_clase(
     nombre_clase: str = Form(...),
+    grado: str = Form(""),
+    ciclo: str = Form(""),
     profesor_id: int = Form(...),
     session: Session = Depends(get_session),
     _=Depends(requiere_login),
 ):
     nueva_clase = Clase(
         nombre_clase=nombre_clase.strip(),
+        grado=grado.strip() or None,
+        ciclo=ciclo.strip() or None,
         profesor_id=profesor_id,
     )
     session.add(nueva_clase)
     session.commit()
 
-    # Redirigimos al usuario de regreso a la lista de clases (código HTTP 303: See Other)
     return RedirectResponse(url="/clases", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -86,6 +83,8 @@ def crear_clase(
 def editar_clase(
     clase_id: int,
     nombre_clase: str = Form(...),
+    grado: str = Form(""),
+    ciclo: str = Form(""),
     profesor_id: int = Form(...),
     session: Session = Depends(get_session),
 ):
@@ -94,11 +93,13 @@ def editar_clase(
         raise HTTPException(status_code=404, detail="Clase no encontrada")
 
     clase.nombre_clase = nombre_clase.strip()
+    clase.grado = grado.strip() or None
+    clase.ciclo = ciclo.strip() or None
     clase.profesor_id = profesor_id
     session.add(clase)
     session.commit()
 
-    return RedirectResponse(url="/clases", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url=f"/clases/{clase_id}/asistencia", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -145,7 +146,6 @@ def crear_profesor(
 ):
     codigo_limpio = codigo_profesor.strip()
 
-    # Verificamos que no exista un profesor con el mismo código
     stmt_existente = select(Profesor).where(Profesor.codigo_profesor == codigo_limpio)
     if session.exec(stmt_existente).first():
         raise HTTPException(status_code=400, detail="Ya existe un profesor con ese código.")
@@ -186,58 +186,48 @@ def eliminar_profesor(
 
 
 # ─────────────────────────────────────────────────────────────
-# 7. Crear grupo + subir Excel en un solo paso
+# 7. Crear grupo + subir archivo (.xlsx, .xlsm, .csv) en un paso
 # ─────────────────────────────────────────────────────────────
 @router.post("/nueva-con-excel")
 async def crear_clase_con_excel(
     nombre_clase: str = Form(...),
+    grado: str = Form(""),
+    ciclo: str = Form(""),
     archivo: UploadFile = File(...),
     session: Session = Depends(get_session),
     _=Depends(requiere_login),
 ):
-    # Buscar el profesor (solo hay uno)
     profesor = session.exec(select(Profesor)).first()
     if not profesor:
         raise HTTPException(status_code=400, detail="No hay ningún profesor registrado. Registra al profesor primero.")
 
-    # Crear la clase
-    nueva_clase = Clase(nombre_clase=nombre_clase.strip(), profesor_id=profesor.id)
+    # Crear la clase con grado y ciclo
+    nueva_clase = Clase(
+        nombre_clase=nombre_clase.strip(),
+        grado=grado.strip() or None,
+        ciclo=ciclo.strip() or None,
+        profesor_id=profesor.id,
+    )
     session.add(nueva_clase)
     session.commit()
     session.refresh(nueva_clase)
 
-    # Leer el Excel y registrar alumnos
+    # Procesar archivo (Excel o CSV)
     contenido = await archivo.read()
-    wb = openpyxl.load_workbook(filename=io.BytesIO(contenido), data_only=True)
-    ws = wb.active
+    try:
+        lista_alumnos = procesar_archivo_alumnos(contenido, archivo.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    col_codigo, col_nombre = 1, 2
-    primera_fila = [str(cell.value or "").strip().lower() for cell in ws[1]]
-    for idx, val in enumerate(primera_fila, start=1):
-        if "cod" in val:
-            col_codigo = idx
-        elif "nom" in val or "alum" in val:
-            col_nombre = idx
-
-    for row in ws.iter_rows(min_row=2, values_only=False):
-        val_cod = row[col_codigo - 1].value if len(row) >= col_codigo else None
-        val_nom = row[col_nombre - 1].value if len(row) >= col_nombre else None
-        if val_cod is None or val_nom is None:
-            continue
-        codigo_str = str(val_cod).strip()
-        if codigo_str.endswith(".0"):
-            codigo_str = codigo_str[:-2]
-        nombre_str = str(val_nom).strip()
-        if not codigo_str or not nombre_str:
-            continue
-        stmt = select(Alumno).where(Alumno.codigo_alumno == codigo_str)
+    for cod_str, nom_str in lista_alumnos:
+        stmt = select(Alumno).where(Alumno.codigo_alumno == cod_str)
         alumno_db = session.exec(stmt).first()
         if alumno_db:
-            alumno_db.nombre_alumno = nombre_str
+            alumno_db.nombre_alumno = nom_str
             alumno_db.clase_id = nueva_clase.id
             session.add(alumno_db)
         else:
-            session.add(Alumno(codigo_alumno=codigo_str, nombre_alumno=nombre_str, clase_id=nueva_clase.id))
+            session.add(Alumno(codigo_alumno=cod_str, nombre_alumno=nom_str, clase_id=nueva_clase.id))
 
     session.commit()
     return RedirectResponse(url=f"/clases/{nueva_clase.id}/asistencia", status_code=status.HTTP_303_SEE_OTHER)

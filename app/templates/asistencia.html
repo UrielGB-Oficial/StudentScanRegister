@@ -12,7 +12,12 @@
           ← Mis grupos
         </a>
         <h1>Asistencias — {{ clase.nombre_clase }}</h1>
-        <p>{{ alumnos_total }} alumnos · {{ sesiones | length }} sesiones registradas</p>
+        <p>
+          {{ alumnos_total }} alumnos · {{ sesiones | length }} sesiones registradas
+          {% if clase.grado or clase.ciclo %}
+            · <span class="badge-meta">{% if clase.grado %}{{ clase.grado }}{% endif %}{% if clase.grado and clase.ciclo %} · {% endif %}{% if clase.ciclo %}{{ clase.ciclo }}{% endif %}</span>
+          {% endif %}
+        </p>
       </div>
       <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
         {# Botón descargar Excel #}
@@ -93,10 +98,10 @@
   {% endif %}
 
 
-  {# ── Botones de Acción (al pie, como en el wireframe) ── #}
+  {# ── Botones de Acción (al pie) ── #}
   <div style="display:flex; gap:0.75rem; margin-top:1.5rem; flex-wrap:wrap;">
 
-    {# Editar nombre del grupo #}
+    {# Editar grupo #}
     <button class="btn-icono btn-icono-editar" id="btn-editar-grupo" title="Editar grupo">
       ✏️
     </button>
@@ -111,21 +116,41 @@
 
 
   {# ══════════════════════════════════════════════════════════
-     MODAL: Editar nombre del grupo
+     MODAL: Editar grupo (Nombre, Grado, Ciclo)
      ══════════════════════════════════════════════════════════ #}
   <div class="modal-overlay" id="modal-editar">
-    <div class="modal-box animate-in">
-      <h3>Editar grupo</h3>
+    <div class="modal-box animate-in" style="max-width: 440px; text-align: left;">
+      <h3 style="text-align: center;">Editar grupo</h3>
       <form method="POST" action="/clases/{{ clase.id }}/editar">
         <input type="hidden" name="profesor_id" value="{{ clase.profesor_id }}" />
+
         <div class="form-group" style="margin-top:1rem;">
           <label for="nuevo-nombre">Nombre del grupo</label>
           <input id="nuevo-nombre" name="nombre_clase" type="text"
                  value="{{ clase.nombre_clase }}" required />
         </div>
-        <div class="modal-acciones">
+
+        <div class="form-row" style="margin-top:0.75rem;">
+          <div class="form-group">
+            <label for="nuevo-grado">Grado</label>
+            <select id="nuevo-grado" name="grado" required>
+              <option value="" disabled {% if not clase.grado %}selected{% endif %}>Seleccionar grado</option>
+              {% for g in grados %}
+                <option value="{{ g }}" {% if clase.grado == g %}selected{% endif %}>{{ g }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="nuevo-ciclo">Ciclo</label>
+            <input id="nuevo-ciclo" name="ciclo" type="text"
+                   value="{{ clase.ciclo or ciclo_actual }}"
+                   placeholder="Ej. 2026B" required />
+          </div>
+        </div>
+
+        <div class="modal-acciones" style="margin-top:1.25rem;">
           <button type="button" class="btn btn-secundario" id="btn-cancelar-editar">Cancelar</button>
-          <button type="submit" class="btn btn-primario">Guardar</button>
+          <button type="submit" class="btn btn-primario" style="flex:1;">Guardar cambios</button>
         </div>
       </form>
     </div>

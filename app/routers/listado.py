@@ -1,25 +1,22 @@
 """
-routers/listado.py — Gestión de Alumnos, Subida Masiva de Excel y Matriz de Asistencia
+routers/listado.py — Gestión de Alumnos, Subida Masiva (Excel / CSV) y Matriz de Asistencia
 
 Este router maneja:
   1. GET  /clases/{id}/alumnos          -> Lista de alumnos de la clase
   2. POST /clases/{id}/alumnos          -> Alta manual de un alumno
-  3. POST /clases/{id}/alumnos/upload   -> Subida de archivo Excel para alta masiva
+  3. POST /clases/{id}/alumnos/upload   -> Subida de archivo Excel (.xlsx, .xlsm) o CSV (.csv)
   4. POST /clases/{id}/alumnos/{alumno_id}/eliminar -> Eliminar un alumno
   5. GET  /clases/{id}/asistencia       -> Vista en navegador de la tabla de asistencia
 """
 
-import io
-from typing import Optional
-
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-import openpyxl
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Alumno, Asistencia, Clase, Sesion
+from app.models import GRADOS_VALIDOS, Alumno, Asistencia, Clase, Sesion
+from app.utils import obtener_ciclo_actual, procesar_archivo_alumnos
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -64,12 +61,10 @@ def agregar_alumno_manual(
     codigo_limpio = codigo_alumno.strip()
     nombre_limpio = nombre_alumno.strip()
 
-    # Verificamos si ya existe ese código
     stmt_existente = select(Alumno).where(Alumno.codigo_alumno == codigo_limpio)
     alumno_existente = session.exec(stmt_existente).first()
 
     if alumno_existente:
-        # Si ya existe, actualizamos su nombre y lo reasignamos a esta clase
         alumno_existente.nombre_alumno = nombre_limpio
         alumno_existente.clase_id = clase_id
         session.add(alumno_existente)
@@ -86,7 +81,7 @@ def agregar_alumno_manual(
 
 
 # ─────────────────────────────────────────────────────────────
-# 3. Subida masiva de alumnos mediante archivo Excel (.xlsx)
+# 3. Subida masiva de alumnos mediante archivo (.xlsx, .xlsm, .csv)
 # ─────────────────────────────────────────────────────────────
 @router.post("/{clase_id}/alumnos/upload")
 async def subir_excel_alumnos(
@@ -95,47 +90,15 @@ async def subir_excel_alumnos(
     session: Session = Depends(get_session),
 ):
     """
-    Lee un archivo Excel con las columnas:
-      - Columna A o con encabezado 'codigo' / 'código': Código del alumno
-      - Columna B o con encabezado 'nombre': Nombre del alumno
+    Procesa un archivo .xlsx, .xlsm o .csv y registra a los alumnos en la clase.
     """
-    if not archivo.filename.endswith((".xlsx", ".xlsm")):
-        raise HTTPException(status_code=400, detail="El archivo debe ser formato Excel (.xlsx)")
-
     contenido = await archivo.read()
-    wb = openpyxl.load_workbook(filename=io.BytesIO(contenido), data_only=True)
-    ws = wb.active
+    try:
+        lista_alumnos = procesar_archivo_alumnos(contenido, archivo.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Detectar qué columnas corresponden a código y nombre
-    col_codigo = 1
-    col_nombre = 2
-
-    primera_fila = [str(cell.value or "").strip().lower() for cell in ws[1]]
-    for idx, val in enumerate(primera_fila, start=1):
-        if "cod" in val:
-            col_codigo = idx
-        elif "nom" in val or "alum" in val:
-            col_nombre = idx
-
-    # Leemos las filas a partir de la fila 2 (saltando los encabezados)
-    for row in ws.iter_rows(min_row=2, values_only=False):
-        val_cod = row[col_codigo - 1].value if len(row) >= col_codigo else None
-        val_nom = row[col_nombre - 1].value if len(row) >= col_nombre else None
-
-        if val_cod is None or val_nom is None:
-            continue
-
-        codigo_str = str(val_cod).strip()
-        # Si el Excel leyó un número decimal (ej. 2181234.0), quitamos el .0
-        if codigo_str.endswith(".0"):
-            codigo_str = codigo_str[:-2]
-
-        nombre_str = str(val_nom).strip()
-
-        if not codigo_str or not nombre_str:
-            continue
-
-        # Buscamos si ya existe el alumno para actualizar o crear nuevo
+    for codigo_str, nombre_str in lista_alumnos:
         stmt = select(Alumno).where(Alumno.codigo_alumno == codigo_str)
         alumno_db = session.exec(stmt).first()
 
@@ -166,7 +129,6 @@ def eliminar_alumno(
 ):
     alumno = session.get(Alumno, alumno_id)
     if alumno:
-        # Borramos sus asistencias primero
         stmt_asistencias = select(Asistencia).where(Asistencia.alumno_id == alumno_id)
         for a in session.exec(stmt_asistencias).all():
             session.delete(a)
@@ -205,7 +167,6 @@ def ver_matriz_asistencia(
         for a in session.exec(stmt_asistencias).all():
             asistencias_map.add((a.sesion_id, a.alumno_id))
 
-    # Construimos la estructura de datos para la plantilla HTML
     filas_asistencia = []
     for al in alumnos:
         presente_en = []
@@ -229,5 +190,7 @@ def ver_matriz_asistencia(
             "sesiones": sesiones,
             "filas": filas_asistencia,
             "alumnos_total": len(alumnos),
+            "grados": GRADOS_VALIDOS,
+            "ciclo_actual": obtener_ciclo_actual(),
         },
     )

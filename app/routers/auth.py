@@ -24,7 +24,7 @@ templates = Jinja2Templates(directory="app/templates")
 # El profesor puede cambiar la contraseña aquí directamente.
 # ─────────────────────────────────────────────────────────────
 USUARIO_VALIDO = os.getenv("APP_USUARIO", "horacio")     # o "2201852"
-PASSWORD_VALIDA = os.getenv("APP_PASSWORD", "taller2026")
+PASSWORD_VALIDA = os.getenv("APP_PASSWORD", "padawans2026")
 
 # ─────────────────────────────────────────────────────────────
 # Mostrar formulario de login
