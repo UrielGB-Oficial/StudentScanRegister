@@ -61,12 +61,14 @@ def agregar_alumno_manual(
     codigo_limpio = codigo_alumno.strip()
     nombre_limpio = nombre_alumno.strip()
 
-    stmt_existente = select(Alumno).where(Alumno.codigo_alumno == codigo_limpio)
+    stmt_existente = select(Alumno).where(
+        Alumno.codigo_alumno == codigo_limpio,
+        Alumno.clase_id == clase_id,
+    )
     alumno_existente = session.exec(stmt_existente).first()
 
     if alumno_existente:
         alumno_existente.nombre_alumno = nombre_limpio
-        alumno_existente.clase_id = clase_id
         session.add(alumno_existente)
     else:
         nuevo_alumno = Alumno(
@@ -99,12 +101,14 @@ async def subir_excel_alumnos(
         raise HTTPException(status_code=400, detail=str(e))
 
     for codigo_str, nombre_str in lista_alumnos:
-        stmt = select(Alumno).where(Alumno.codigo_alumno == codigo_str)
+        stmt = select(Alumno).where(
+            Alumno.codigo_alumno == codigo_str,
+            Alumno.clase_id == clase_id,
+        )
         alumno_db = session.exec(stmt).first()
 
         if alumno_db:
             alumno_db.nombre_alumno = nombre_str
-            alumno_db.clase_id = clase_id
             session.add(alumno_db)
         else:
             nuevo = Alumno(
@@ -119,7 +123,45 @@ async def subir_excel_alumnos(
 
 
 # ─────────────────────────────────────────────────────────────
-# 4. Eliminar un Alumno
+# 4. Editar los datos de un Alumno (Código y Nombre)
+# ─────────────────────────────────────────────────────────────
+@router.post("/{clase_id}/alumnos/{alumno_id}/editar")
+def editar_alumno(
+    clase_id: int,
+    alumno_id: int,
+    codigo_alumno: str = Form(...),
+    nombre_alumno: str = Form(...),
+    session: Session = Depends(get_session),
+):
+    alumno = session.get(Alumno, alumno_id)
+    if not alumno or alumno.clase_id != clase_id:
+        raise HTTPException(status_code=404, detail="Alumno no encontrado en esta clase")
+
+    codigo_limpio = codigo_alumno.strip()
+    nombre_limpio = nombre_alumno.strip()
+
+    # Validar que no exista otro alumno con el mismo código en esta misma clase
+    stmt_duplicado = select(Alumno).where(
+        Alumno.clase_id == clase_id,
+        Alumno.codigo_alumno == codigo_limpio,
+        Alumno.id != alumno_id,
+    )
+    if session.exec(stmt_duplicado).first():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ya existe otro alumno en esta clase con el código '{codigo_limpio}'.",
+        )
+
+    alumno.codigo_alumno = codigo_limpio
+    alumno.nombre_alumno = nombre_limpio
+    session.add(alumno)
+    session.commit()
+
+    return RedirectResponse(url=f"/clases/{clase_id}/alumnos", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# ─────────────────────────────────────────────────────────────
+# 5. Eliminar un Alumno
 # ─────────────────────────────────────────────────────────────
 @router.post("/{clase_id}/alumnos/{alumno_id}/eliminar")
 def eliminar_alumno(

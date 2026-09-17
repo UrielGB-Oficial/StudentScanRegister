@@ -37,21 +37,29 @@
   <table class="tabla-asistencia">
     <thead>
       <tr>
+        <th style="width:50px; text-align:center;">#</th>
         <th>Código</th>
         <th>Nombre del Alumno</th>
-        <th style="text-align:center;">Acciones</th>
+        <th style="text-align:center; width:120px;">Acciones</th>
       </tr>
     </thead>
     <tbody>
       {% for alumno in alumnos %}
       <tr>
+        <td style="text-align:center; font-weight:600; color:var(--texto-suave);">{{ loop.index }}</td>
         <td style="font-size:0.85rem; color:var(--texto-suave);">{{ alumno.codigo_alumno }}</td>
         <td>{{ alumno.nombre_alumno }}</td>
-        <td style="text-align:center;">
-          <button type="button" class="btn-icono btn-icono-borrar" title="Eliminar alumno"
-            onclick="abrirModalEliminarAlumno('{{ alumno.id }}', '{{ alumno.nombre_alumno }}')">
-            🗑️
-          </button>
+        <td style="text-align:center; white-space:nowrap;">
+          <div style="display:inline-flex; gap:0.4rem; justify-content:center; align-items:center;">
+            <button type="button" class="btn-icono btn-icono-editar" title="Editar datos del alumno"
+              onclick="abrirModalEditarAlumno('{{ alumno.id }}', '{{ alumno.codigo_alumno }}', '{{ alumno.nombre_alumno }}')">
+              ✏️
+            </button>
+            <button type="button" class="btn-icono btn-icono-borrar" title="Eliminar alumno"
+              onclick="abrirModalEliminarAlumno('{{ alumno.id }}', '{{ alumno.nombre_alumno }}')">
+              🗑️
+            </button>
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -131,10 +139,33 @@ MODAL: Agregar alumno individual
 
 
 {# ══════════════════════════════════════════════════════════
+MODAL: Editar datos del Alumno
+══════════════════════════════════════════════════════════ #}
+<div class="modal-overlay" id="modal-editar-alumno">
+  <div class="modal-box" style="max-width:440px; text-align:left;">
+    <h3>Editar datos del alumno</h3>
+    <form id="form-editar-alumno" method="POST" action="" style="margin-top:1rem; text-align:left;">
+      <div class="form-group">
+        <label for="editar_codigo_alumno">Código (número de control)</label>
+        <input id="editar_codigo_alumno" name="codigo_alumno" type="text" placeholder="Ej. 2201234" maxlength="20" required />
+      </div>
+      <div class="form-group">
+        <label for="editar_nombre_alumno">Nombre completo</label>
+        <input id="editar_nombre_alumno" name="nombre_alumno" type="text" placeholder="Ej. María López García" required />
+      </div>
+      <div class="modal-acciones" style="margin-top:1.25rem;">
+        <button type="button" class="btn btn-secundario" id="btn-cancelar-editar-alumno">Cancelar</button>
+        <button type="submit" class="btn btn-primario">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════
 MODAL: Confirmación de Eliminar Alumno
 ══════════════════════════════════════════════════════════ #}
 <div class="modal-overlay" id="modal-eliminar-alumno">
-  <div class="modal-box animate-in">
+  <div class="modal-box">
     <h3>¿Eliminar alumno?</h3>
     <p>
       ¿Estás seguro de que deseas eliminar a <strong id="nombre-alumno-eliminar"></strong>? Esta acción borrará también
@@ -187,13 +218,30 @@ MODAL: Confirmación de Eliminar Alumno
     uploadZoneAlumnos.classList.remove('tiene-archivo');
   }
 
-
-
   // Modal Agregar Alumno
   const modalAgregar = document.getElementById('modal-agregar');
   document.getElementById('btn-agregar-uno').addEventListener('click', () => modalAgregar.classList.add('activo'));
   document.getElementById('btn-cancelar-agregar').addEventListener('click', () => modalAgregar.classList.remove('activo'));
   modalAgregar.addEventListener('click', (e) => { if (e.target === modalAgregar) modalAgregar.classList.remove('activo'); });
+
+  // Modal Editar Alumno
+  const modalEditarAlumno = document.getElementById('modal-editar-alumno');
+  const formEditarAlumno = document.getElementById('form-editar-alumno');
+  const inputEditarCodigo = document.getElementById('editar_codigo_alumno');
+  const inputEditarNombre = document.getElementById('editar_nombre_alumno');
+  const btnCancelarEditarAlumno = document.getElementById('btn-cancelar-editar-alumno');
+
+  function abrirModalEditarAlumno(alumnoId, codigoAlumno, nombreAlumno) {
+    formEditarAlumno.action = `/clases/{{ clase.id }}/alumnos/${alumnoId}/editar`;
+    inputEditarCodigo.value = codigoAlumno;
+    inputEditarNombre.value = nombreAlumno;
+    modalEditarAlumno.classList.add('activo');
+  }
+
+  btnCancelarEditarAlumno.addEventListener('click', () => modalEditarAlumno.classList.remove('activo'));
+  modalEditarAlumno.addEventListener('click', (e) => {
+    if (e.target === modalEditarAlumno) modalEditarAlumno.classList.remove('activo');
+  });
 
   // Modal Confirmar Eliminar Alumno
   const modalEliminarAlumno = document.getElementById('modal-eliminar-alumno');

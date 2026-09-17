@@ -39,7 +39,7 @@ class Clase(SQLModel, table=True):
 # ─────────────────────────────────────────────
 class Alumno(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    codigo_alumno: str = Field(max_length=9, unique=True, index=True)
+    codigo_alumno: str = Field(max_length=20, index=True)
     nombre_alumno: str = Field(max_length=64)
     clase_id: int = Field(foreign_key="clase.id")
     clase: Optional[Clase] = Relationship(back_populates="alumnos")

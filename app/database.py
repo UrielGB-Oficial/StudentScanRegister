@@ -38,7 +38,7 @@ def create_db_and_tables() -> None:
     # 2. Crea las tablas si no existen
     SQLModel.metadata.create_all(engine)
 
-    # 3. Migración automática de columnas para bases de datos existentes
+    # 3. Migración automática de columnas e índices para bases de datos existentes
     with engine.connect() as conn:
         cursor = conn.connection.cursor()
         columnas_clase = [col[1] for col in cursor.execute("PRAGMA table_info(clase)").fetchall()]
@@ -47,7 +47,16 @@ def create_db_and_tables() -> None:
                 cursor.execute("ALTER TABLE clase ADD COLUMN grado VARCHAR(10)")
             if "ciclo" not in columnas_clase:
                 cursor.execute("ALTER TABLE clase ADD COLUMN ciclo VARCHAR(20)")
-            conn.connection.commit()
+        
+        # Eliminar índice UNIQUE en codigo_alumno para permitir alumnos en múltiples clases
+        indices_alumno = cursor.execute("PRAGMA index_list(alumno)").fetchall()
+        for idx in indices_alumno:
+            nombre_idx = idx[1]
+            es_unico = idx[2]
+            if "codigo_alumno" in nombre_idx and es_unico:
+                cursor.execute(f"DROP INDEX IF EXISTS {nombre_idx}")
+                cursor.execute("CREATE INDEX IF NOT EXISTS ix_alumno_codigo_alumno ON alumno (codigo_alumno)")
+        conn.connection.commit()
 
     # 4. Semilla inicial: Horacio como profesor único por defecto
     with Session(engine) as session:

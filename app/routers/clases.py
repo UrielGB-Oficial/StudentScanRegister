@@ -220,11 +220,13 @@ async def crear_clase_con_excel(
         raise HTTPException(status_code=400, detail=str(e))
 
     for cod_str, nom_str in lista_alumnos:
-        stmt = select(Alumno).where(Alumno.codigo_alumno == cod_str)
+        stmt = select(Alumno).where(
+            Alumno.codigo_alumno == cod_str,
+            Alumno.clase_id == nueva_clase.id,
+        )
         alumno_db = session.exec(stmt).first()
         if alumno_db:
             alumno_db.nombre_alumno = nom_str
-            alumno_db.clase_id = nueva_clase.id
             session.add(alumno_db)
         else:
             session.add(Alumno(codigo_alumno=cod_str, nombre_alumno=nom_str, clase_id=nueva_clase.id))

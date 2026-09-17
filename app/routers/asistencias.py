@@ -80,53 +80,73 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
 
     # ─────────────────────────────────────────────────────────
     # PASO B: ¿El código escaneado es de un ALUMNO?
-    # Equivalente a: SELECT * FROM alumno WHERE codigo_alumno = '...'
+    # Un alumno puede estar inscrito en más de una clase (materias diferentes).
     # ─────────────────────────────────────────────────────────
-    stmt_alumno = select(Alumno).where(Alumno.codigo_alumno == codigo_limpio)
-    alumno = session.exec(stmt_alumno).first()
+    stmt_alumnos = select(Alumno).where(Alumno.codigo_alumno == codigo_limpio)
+    alumnos_encontrados = session.exec(stmt_alumnos).all()
 
-    if alumno:
-        # Obtenemos los datos de la clase a la que pertenece el alumno
-        clase = session.get(Clase, alumno.clase_id)
+    if alumnos_encontrados:
+        alumno_elegido: Optional[Alumno] = None
+        sesion_hoy: Optional[Sesion] = None
+        clase: Optional[Clase] = None
 
-        # 1. Verificamos si YA existe una sesión abierta hoy para esta clase
-        stmt_sesion = select(Sesion).where(
-            Sesion.clase_id == alumno.clase_id,
-            Sesion.fecha == hoy,
-        )
-        sesion_hoy = session.exec(stmt_sesion).first()
+        # 1. Si hay un profesor en espera, buscamos la clase de este profesor en la que esté el alumno
+        if profesor_en_espera and profesor_en_espera["fecha"] == hoy:
+            for al in alumnos_encontrados:
+                c = session.get(Clase, al.clase_id)
+                if c and c.profesor_id == profesor_en_espera["profesor_id"]:
+                    alumno_elegido = al
+                    clase = c
+                    break
 
-        # 2. Si NO hay sesión abierta hoy, revisamos si hay un profesor en espera
-        if not sesion_hoy:
-            if profesor_en_espera and profesor_en_espera["fecha"] == hoy:
-                # Verificamos si el profesor en espera es quien imparte la clase del alumno
-                if clase and clase.profesor_id == profesor_en_espera["profesor_id"]:
-                    # ¡COINCIDEN! Creamos la sesión del día para esta clase
-                    sesion_hoy = Sesion(clase_id=alumno.clase_id, fecha=hoy)
-                    session.add(sesion_hoy)
-                    session.commit()
-                    session.refresh(sesion_hoy)
-
-                    # Limpiamos el modo espera del profesor porque la clase ya inició
-                    profesor_en_espera = None
-                else:
-                    return {
-                        "status": "error",
-                        "tipo": "alumno",
-                        "mensaje": f"El profesor en espera ({profesor_en_espera['nombre']}) no imparte la materia '{clase.nombre_clase if clase else ''}'.",
-                    }
-            else:
+            if not alumno_elegido:
                 return {
                     "status": "error",
                     "tipo": "alumno",
-                    "mensaje": "No hay sesión abierta hoy para esta clase. El profesor debe escanear su credencial primero.",
+                    "mensaje": f"El alumno no está registrado en ninguna clase del profesor en espera ({profesor_en_espera['nombre']}).",
                 }
 
-        # 3. Llegados a este punto, tenemos una sesión válida (sesion_hoy).
+            # Abrimos la sesión del día para esta clase
+            stmt_sesion = select(Sesion).where(
+                Sesion.clase_id == alumno_elegido.clase_id,
+                Sesion.fecha == hoy,
+            )
+            sesion_hoy = session.exec(stmt_sesion).first()
+            if not sesion_hoy:
+                sesion_hoy = Sesion(clase_id=alumno_elegido.clase_id, fecha=hoy)
+                session.add(sesion_hoy)
+                session.commit()
+                session.refresh(sesion_hoy)
+
+            # Limpiamos el modo espera del profesor porque la clase ya inició
+            profesor_en_espera = None
+
+        else:
+            # 2. Si no hay profesor en espera, buscamos si hay una sesión ya iniciada hoy para alguna clase del alumno
+            for al in alumnos_encontrados:
+                stmt_sesion = select(Sesion).where(
+                    Sesion.clase_id == al.clase_id,
+                    Sesion.fecha == hoy,
+                )
+                s = session.exec(stmt_sesion).first()
+                if s:
+                    alumno_elegido = al
+                    sesion_hoy = s
+                    clase = session.get(Clase, al.clase_id)
+                    break
+
+            if not sesion_hoy or not alumno_elegido:
+                return {
+                    "status": "error",
+                    "tipo": "alumno",
+                    "mensaje": "No hay sesión abierta hoy para la clase de este alumno. El profesor debe escanear su credencial primero.",
+                }
+
+        # 3. Llegados a este punto, tenemos un alumno y una sesión válida (sesion_hoy).
         # Verificamos si el alumno ya había registrado asistencia hoy
         stmt_asistencia = select(Asistencia).where(
             Asistencia.sesion_id == sesion_hoy.id,
-            Asistencia.alumno_id == alumno.id,
+            Asistencia.alumno_id == alumno_elegido.id,
         )
         asistencia_existente = session.exec(stmt_asistencia).first()
 
@@ -138,15 +158,15 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
             return {
                 "status": "ok",
                 "tipo": "alumno",
-                "nombre": alumno.nombre_alumno,
+                "nombre": alumno_elegido.nombre_alumno,
                 "clase": clase.nombre_clase if clase else "",
-                "mensaje": f"Asistencia ya registrada previamente para {alumno.nombre_alumno}. Hora actualizada.",
+                "mensaje": f"Asistencia ya registrada previamente para {alumno_elegido.nombre_alumno}. Hora actualizada.",
             }
         else:
             # Nuevo registro de asistencia
             nueva_asistencia = Asistencia(
                 sesion_id=sesion_hoy.id,
-                alumno_id=alumno.id,
+                alumno_id=alumno_elegido.id,
                 hora_llegada=hora_actual,
             )
             session.add(nueva_asistencia)
@@ -154,9 +174,9 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
             return {
                 "status": "ok",
                 "tipo": "alumno",
-                "nombre": alumno.nombre_alumno,
+                "nombre": alumno_elegido.nombre_alumno,
                 "clase": clase.nombre_clase if clase else "",
-                "mensaje": f"Asistencia registrada con éxito: {alumno.nombre_alumno}",
+                "mensaje": f"Asistencia registrada con éxito: {alumno_elegido.nombre_alumno}",
             }
 
     # ─────────────────────────────────────────────────────────

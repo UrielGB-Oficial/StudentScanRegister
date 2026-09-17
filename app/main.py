@@ -1,7 +1,11 @@
 # main.py — Punto de entrada del servidor
 
 # Para arrancar el servidor, ejecutas:
-#   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+#   venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+#
+#   http://localhost:8000/clases
+
+
 
 
 import os
