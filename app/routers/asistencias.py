@@ -29,17 +29,16 @@ router = APIRouter()
 # ─────────────────────────────────────────────────────────────
 class ScanRequest(BaseModel):
     """
-    Define la estructura que el lector (o script lector.py) debe enviar por HTTP.
-    Ejemplo de JSON: { "codigo": "218123456" }
+    Define la estructura que el lector (o script lector.py, o navegador) envía por HTTP.
+    Ejemplo de JSON: { "codigo": "218123456", "clase_id": 1 }
     """
     codigo: str
+    clase_id: Optional[int] = None
 
 
 # ─────────────────────────────────────────────────────────────
 # 2. Estado en memoria: Profesor en espera
 # ─────────────────────────────────────────────────────────────
-# Variable global temporal para recordar si un profesor acaba de escanear.
-# Guarda un diccionario: {"profesor_id": 1, "nombre": "Juan Perez", "fecha": date(2026, 9, 1)}
 profesor_en_espera: Optional[dict] = None
 
 
@@ -53,67 +52,103 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
     Identifica automáticamente si es un Profesor o un Alumno y ejecuta la lógica.
     """
     global profesor_en_espera
-    codigo_limpio = datos.codigo.strip()
+
+    # Limpiar el código de espacios, retornos de carro (\r, \n) y caracteres no imprimibles
+    raw_codigo = datos.codigo or ""
+    codigo_limpio = "".join(c for c in raw_codigo if c.isprintable()).strip()
+    codigo_sin_ceros = codigo_limpio.lstrip("0")
     hoy = date.today()
     hora_actual = datetime.now().time()
 
+    print(f"\n[SCAN] Codigo recibido: '{codigo_limpio}' | raw: {repr(raw_codigo)} | clase_id: {datos.clase_id}")
+
     # ─────────────────────────────────────────────────────────
     # PASO A: ¿El código escaneado es de un PROFESOR?
-    # Equivalente a: SELECT * FROM profesor WHERE codigo_profesor = '...'
     # ─────────────────────────────────────────────────────────
     stmt_profesor = select(Profesor).where(Profesor.codigo_profesor == codigo_limpio)
     profesor = session.exec(stmt_profesor).first()
 
+    # Si no coincide exactamente, probar sin ceros a la izquierda
+    if not profesor and codigo_sin_ceros and codigo_sin_ceros != codigo_limpio:
+        stmt_profesor = select(Profesor).where(Profesor.codigo_profesor == codigo_sin_ceros)
+        profesor = session.exec(stmt_profesor).first()
+
     if profesor:
-        # Ponemos al profesor en modo espera
         profesor_en_espera = {
             "profesor_id": profesor.id,
             "nombre": profesor.nombre_profesor,
             "fecha": hoy,
         }
+        print(f"  [PROFESOR] Identificado: {profesor.nombre_profesor} (ID: {profesor.id})")
+
+        # Si se envió clase_id desde la interfaz web, abrimos la sesión de esa clase de inmediato
+        if datos.clase_id:
+            clase_web = session.get(Clase, datos.clase_id)
+            if clase_web and clase_web.profesor_id == profesor.id:
+                stmt_ses = select(Sesion).where(Sesion.clase_id == datos.clase_id, Sesion.fecha == hoy)
+                ses_activa = session.exec(stmt_ses).first()
+                if not ses_activa:
+                    ses_activa = Sesion(clase_id=datos.clase_id, fecha=hoy, hora_apertura=hora_actual)
+                    session.add(ses_activa)
+                    session.commit()
+                    session.refresh(ses_activa)
+                    print(f"  [SESION] Creada de inmediato para clase: {clase_web.nombre_clase}")
+
         return {
             "status": "ok",
             "tipo": "profesor",
             "nombre": profesor.nombre_profesor,
-            "mensaje": f"Profesor {profesor.nombre_profesor} listo. Esperando escaneo del primer alumno para iniciar clase.",
+            "mensaje": f"Profesor {profesor.nombre_profesor} listo. Registro de asistencia abierto.",
         }
 
     # ─────────────────────────────────────────────────────────
     # PASO B: ¿El código escaneado es de un ALUMNO?
-    # Un alumno puede estar inscrito en más de una clase (materias diferentes).
     # ─────────────────────────────────────────────────────────
     stmt_alumnos = select(Alumno).where(Alumno.codigo_alumno == codigo_limpio)
     alumnos_encontrados = session.exec(stmt_alumnos).all()
+
+    if not alumnos_encontrados and codigo_sin_ceros and codigo_sin_ceros != codigo_limpio:
+        stmt_alumnos = select(Alumno).where(Alumno.codigo_alumno == codigo_sin_ceros)
+        alumnos_encontrados = session.exec(stmt_alumnos).all()
 
     if alumnos_encontrados:
         alumno_elegido: Optional[Alumno] = None
         sesion_hoy: Optional[Sesion] = None
         clase: Optional[Clase] = None
 
-        # 1. Si hay un profesor en espera, buscamos la clase de este profesor en la que esté el alumno
-        if profesor_en_espera and profesor_en_espera["fecha"] == hoy:
+        # Si se especificó clase_id desde la página actual, priorizar la inscripción en esa clase
+        if datos.clase_id:
             for al in alumnos_encontrados:
-                c = session.get(Clase, al.clase_id)
-                if c and c.profesor_id == profesor_en_espera["profesor_id"]:
+                if al.clase_id == datos.clase_id:
                     alumno_elegido = al
-                    clase = c
+                    clase = session.get(Clase, al.clase_id)
                     break
+
+        # 1. Si hay un profesor en espera hoy
+        if profesor_en_espera and profesor_en_espera["fecha"] == hoy:
+            if not alumno_elegido:
+                for al in alumnos_encontrados:
+                    c = session.get(Clase, al.clase_id)
+                    if c and c.profesor_id == profesor_en_espera["profesor_id"]:
+                        alumno_elegido = al
+                        clase = c
+                        break
 
             if not alumno_elegido:
                 return {
                     "status": "error",
                     "tipo": "alumno",
-                    "mensaje": f"El alumno no está registrado en ninguna clase del profesor en espera ({profesor_en_espera['nombre']}).",
+                    "mensaje": f"El alumno no está en ninguna clase del profesor en espera ({profesor_en_espera['nombre']}).",
                 }
 
-            # Abrimos la sesión del día para esta clase
+            # Abrimos la sesión del día para esta clase si no existe
             stmt_sesion = select(Sesion).where(
                 Sesion.clase_id == alumno_elegido.clase_id,
                 Sesion.fecha == hoy,
             )
             sesion_hoy = session.exec(stmt_sesion).first()
             if not sesion_hoy:
-                sesion_hoy = Sesion(clase_id=alumno_elegido.clase_id, fecha=hoy)
+                sesion_hoy = Sesion(clase_id=alumno_elegido.clase_id, fecha=hoy, hora_apertura=hora_actual)
                 session.add(sesion_hoy)
                 session.commit()
                 session.refresh(sesion_hoy)
@@ -122,28 +157,50 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
             profesor_en_espera = None
 
         else:
-            # 2. Si no hay profesor en espera, buscamos si hay una sesión ya iniciada hoy para alguna clase del alumno
-            for al in alumnos_encontrados:
+            # 2. Si no hay profesor en espera en RAM, buscamos si hay una sesión ya abierta hoy
+            if alumno_elegido:
                 stmt_sesion = select(Sesion).where(
-                    Sesion.clase_id == al.clase_id,
+                    Sesion.clase_id == alumno_elegido.clase_id,
                     Sesion.fecha == hoy,
                 )
-                s = session.exec(stmt_sesion).first()
-                if s:
-                    alumno_elegido = al
-                    sesion_hoy = s
-                    clase = session.get(Clase, al.clase_id)
-                    break
+                sesion_hoy = session.exec(stmt_sesion).first()
+
+            if not sesion_hoy:
+                for al in alumnos_encontrados:
+                    stmt_sesion = select(Sesion).where(
+                        Sesion.clase_id == al.clase_id,
+                        Sesion.fecha == hoy,
+                    )
+                    s = session.exec(stmt_sesion).first()
+                    if s:
+                        alumno_elegido = al
+                        sesion_hoy = s
+                        clase = session.get(Clase, al.clase_id)
+                        break
+
+            # 3. Si aún no hay sesión hoy, pero el alumno pertenece a una clase del único profesor
+            if not sesion_hoy:
+                # Comprobar si hay un único profesor en el sistema
+                profesor_unico = session.exec(select(Profesor)).first()
+                if profesor_unico and alumno_elegido:
+                    c = session.get(Clase, alumno_elegido.clase_id)
+                    if c and c.profesor_id == profesor_unico.id:
+                        # Auto-abrir sesión para facilitar pruebas y uso continuo
+                        sesion_hoy = Sesion(clase_id=alumno_elegido.clase_id, fecha=hoy, hora_apertura=hora_actual)
+                        session.add(sesion_hoy)
+                        session.commit()
+                        session.refresh(sesion_hoy)
+                        clase = c
+                        print(f"  [SESION] Abierta automaticamente para: {clase.nombre_clase}")
 
             if not sesion_hoy or not alumno_elegido:
                 return {
                     "status": "error",
                     "tipo": "alumno",
-                    "mensaje": "No hay sesión abierta hoy para la clase de este alumno. El profesor debe escanear su credencial primero.",
+                    "mensaje": "No hay sesión abierta hoy para este grupo. El profesor debe escanear su credencial primero o presionar 'Abrir registro de hoy'.",
                 }
 
-        # 3. Llegados a este punto, tenemos un alumno y una sesión válida (sesion_hoy).
-        # Verificamos si el alumno ya había registrado asistencia hoy
+        # 4. Registrar o actualizar la asistencia del alumno
         stmt_asistencia = select(Asistencia).where(
             Asistencia.sesion_id == sesion_hoy.id,
             Asistencia.alumno_id == alumno_elegido.id,
@@ -151,19 +208,18 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
         asistencia_existente = session.exec(stmt_asistencia).first()
 
         if asistencia_existente:
-            # Si ya escaneó antes, solo actualizamos la hora (no duplicamos registros)
             asistencia_existente.hora_llegada = hora_actual
             session.add(asistencia_existente)
             session.commit()
+            print(f"  [OK] Asistencia actualizada: {alumno_elegido.nombre_alumno} ({hora_actual.strftime('%H:%M:%S')})")
             return {
                 "status": "ok",
                 "tipo": "alumno",
                 "nombre": alumno_elegido.nombre_alumno,
                 "clase": clase.nombre_clase if clase else "",
-                "mensaje": f"Asistencia ya registrada previamente para {alumno_elegido.nombre_alumno}. Hora actualizada.",
+                "mensaje": f"Asistencia ya registrada. Hora actualizada a {hora_actual.strftime('%H:%M:%S')}.",
             }
         else:
-            # Nuevo registro de asistencia
             nueva_asistencia = Asistencia(
                 sesion_id=sesion_hoy.id,
                 alumno_id=alumno_elegido.id,
@@ -171,6 +227,7 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
             )
             session.add(nueva_asistencia)
             session.commit()
+            print(f"  [OK] Asistencia registrada: {alumno_elegido.nombre_alumno} ({hora_actual.strftime('%H:%M:%S')})")
             return {
                 "status": "ok",
                 "tipo": "alumno",
@@ -182,10 +239,48 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
     # ─────────────────────────────────────────────────────────
     # PASO C: El código no es ni de Profesor ni de Alumno
     # ─────────────────────────────────────────────────────────
+    print(f"  [WARN] Codigo '{codigo_limpio}' no encontrado en profesores ni alumnos.")
     return {
         "status": "error",
         "tipo": "desconocido",
         "mensaje": f"El código '{codigo_limpio}' no está registrado en el sistema.",
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# 4. Abrir sesión del día manualmente desde la interfaz web
+# ─────────────────────────────────────────────────────────────
+@router.post("/sesiones/{clase_id}/abrir")
+def abrir_sesion_manualmente(clase_id: int, session: Session = Depends(get_session)):
+    """
+    Permite abrir la sesión de hoy para una clase desde un botón en la interfaz web,
+    sin requerir obligatoriamente el escaneo previo de la credencial del profesor.
+    """
+    clase = session.get(Clase, clase_id)
+    if not clase:
+        raise HTTPException(status_code=404, detail="Clase no encontrada")
+
+    hoy = date.today()
+    hora_actual = datetime.now().time()
+
+    stmt = select(Sesion).where(Sesion.clase_id == clase_id, Sesion.fecha == hoy)
+    sesion_hoy = session.exec(stmt).first()
+
+    if not sesion_hoy:
+        sesion_hoy = Sesion(clase_id=clase_id, fecha=hoy, hora_apertura=hora_actual)
+        session.add(sesion_hoy)
+        session.commit()
+        session.refresh(sesion_hoy)
+        mensaje = f"Sesión abierta exitosamente para {clase.nombre_clase}."
+    else:
+        mensaje = f"La sesión de hoy ya estaba abierta para {clase.nombre_clase}."
+
+    return {
+        "status": "ok",
+        "sesion_id": sesion_hoy.id,
+        "fecha": str(sesion_hoy.fecha),
+        "hora_apertura": sesion_hoy.hora_apertura.strftime("%H:%M:%S") if sesion_hoy.hora_apertura else None,
+        "mensaje": mensaje,
     }
 
 
@@ -280,3 +375,139 @@ def descargar_excel_asistencias(clase_id: int, session: Session = Depends(get_se
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# 5. Togglear asistencia de un alumno en una sesión
+# ─────────────────────────────────────────────────────────────
+class ToggleAsistenciaRequest(BaseModel):
+    sesion_id: int
+    alumno_id: int
+
+@router.post("/asistencias/toggle")
+def toggle_asistencia(datos: ToggleAsistenciaRequest, session: Session = Depends(get_session)):
+    """
+    Alterna el estado de asistencia de un alumno en una sesión.
+    Si existe el registro, lo elimina (ausentarse). Si no existe, lo crea (marcar presente).
+    """
+    stmt = select(Asistencia).where(
+        Asistencia.sesion_id == datos.sesion_id,
+        Asistencia.alumno_id == datos.alumno_id,
+    )
+    existente = session.exec(stmt).first()
+
+    if existente:
+        session.delete(existente)
+        session.commit()
+        return {"status": "ok", "asistio": False, "mensaje": "Asistencia eliminada"}
+    else:
+        from datetime import datetime
+        nueva = Asistencia(
+            sesion_id=datos.sesion_id,
+            alumno_id=datos.alumno_id,
+            hora_llegada=datetime.now().time(),
+        )
+        session.add(nueva)
+        session.commit()
+        return {"status": "ok", "asistio": True, "mensaje": "Asistencia registrada"}
+
+
+# ─────────────────────────────────────────────────────────────
+# 6. Agregar una nueva sesión (columna de fecha) a una clase
+# ─────────────────────────────────────────────────────────────
+class NuevaSesionRequest(BaseModel):
+    clase_id: int
+    fecha: Optional[str] = None  # Formato YYYY-MM-DD o None para fecha de hoy
+
+@router.post("/sesiones/agregar")
+def agregar_sesion(datos: NuevaSesionRequest, session: Session = Depends(get_session)):
+    """
+    Crea una nueva sesión para la clase indicada. Si no se proporciona fecha, usa hoy.
+    """
+    from datetime import date as date_type, datetime
+
+    if datos.fecha:
+        try:
+            fecha_obj = date_type.fromisoformat(datos.fecha)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD.")
+    else:
+        fecha_obj = date_type.today()
+
+    clase = session.get(Clase, datos.clase_id)
+    if not clase:
+        raise HTTPException(status_code=404, detail="Clase no encontrada")
+
+    # Verificar que no exista ya una sesión en esa fecha para esta clase
+    stmt = select(Sesion).where(Sesion.clase_id == datos.clase_id, Sesion.fecha == fecha_obj)
+    existente = session.exec(stmt).first()
+    if existente:
+        return {"status": "ok", "sesion_id": existente.id, "fecha": str(existente.fecha), "nueva": False}
+
+    nueva_sesion = Sesion(clase_id=datos.clase_id, fecha=fecha_obj, hora_apertura=datetime.now().time())
+    session.add(nueva_sesion)
+    session.commit()
+    session.refresh(nueva_sesion)
+
+    return {"status": "ok", "sesion_id": nueva_sesion.id, "fecha": str(nueva_sesion.fecha), "nueva": True}
+
+
+# ─────────────────────────────────────────────────────────────
+# 7. Editar la fecha de una sesión existente
+# ─────────────────────────────────────────────────────────────
+class EditarSesionRequest(BaseModel):
+    fecha: str  # Formato YYYY-MM-DD
+
+@router.post("/sesiones/{sesion_id}/editar")
+def editar_sesion(sesion_id: int, datos: EditarSesionRequest, session: Session = Depends(get_session)):
+    """
+    Cambia la fecha de una sesión existente.
+    """
+    from datetime import date as date_type
+
+    sesion = session.get(Sesion, sesion_id)
+    if not sesion:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+    try:
+        nueva_fecha = date_type.fromisoformat(datos.fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD.")
+
+    # Verificar que no haya otra sesión con la misma fecha en esta clase
+    stmt = select(Sesion).where(
+        Sesion.clase_id == sesion.clase_id,
+        Sesion.fecha == nueva_fecha,
+        Sesion.id != sesion_id,
+    )
+    if session.exec(stmt).first():
+        raise HTTPException(status_code=400, detail=f"Ya existe una sesión el {datos.fecha} en esta clase.")
+
+    sesion.fecha = nueva_fecha
+    session.add(sesion)
+    session.commit()
+
+    return {"status": "ok", "sesion_id": sesion_id, "fecha": str(nueva_fecha)}
+
+
+# ─────────────────────────────────────────────────────────────
+# 8. Eliminar una sesión y todas sus asistencias
+# ─────────────────────────────────────────────────────────────
+@router.delete("/sesiones/{sesion_id}")
+def eliminar_sesion(sesion_id: int, session: Session = Depends(get_session)):
+    """
+    Elimina una sesión y todos los registros de asistencia asociados.
+    """
+    sesion = session.get(Sesion, sesion_id)
+    if not sesion:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+    # Eliminar asistencias de esa sesión primero
+    stmt_asistencias = select(Asistencia).where(Asistencia.sesion_id == sesion_id)
+    for a in session.exec(stmt_asistencias).all():
+        session.delete(a)
+
+    session.delete(sesion)
+    session.commit()
+
+    return {"status": "ok", "mensaje": f"Sesión del {sesion.fecha} eliminada correctamente."}

@@ -47,6 +47,11 @@ def create_db_and_tables() -> None:
                 cursor.execute("ALTER TABLE clase ADD COLUMN grado VARCHAR(10)")
             if "ciclo" not in columnas_clase:
                 cursor.execute("ALTER TABLE clase ADD COLUMN ciclo VARCHAR(20)")
+
+        # Migración para columna hora_apertura en sesion
+        columnas_sesion = [col[1] for col in cursor.execute("PRAGMA table_info(sesion)").fetchall()]
+        if columnas_sesion and "hora_apertura" not in columnas_sesion:
+            cursor.execute("ALTER TABLE sesion ADD COLUMN hora_apertura TIME")
         
         # Eliminar índice UNIQUE en codigo_alumno para permitir alumnos en múltiples clases
         indices_alumno = cursor.execute("PRAGMA index_list(alumno)").fetchall()

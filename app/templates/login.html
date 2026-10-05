@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Iniciar sesión — Taller de Redes</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <title>Iniciar sesión — StudentScanRegister</title>
+  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="icon" type="image/png" href="/static/logo.png" />
 </head>
 <body>
 
@@ -12,9 +13,11 @@
     <div class="login-card animate-in">
 
       {# Ícono / Logo #}
-      <div class="login-logo">📡</div>
+      <div class="login-logo-container">
+        <img src="/static/logo.png" alt="StudentScanRegister" class="login-logo-img" style="height: 54px; max-height: 54px; width: auto; max-width: 120px; object-fit: contain;" />
+      </div>
 
-      <h1>Taller de Redes</h1>
+      <h1>StudentScanRegister</h1>
       <p class="subtitulo">Sistema de Registro de Asistencias</p>
 
       {# Mensaje de error (aparece solo si las credenciales son incorrectas) #}

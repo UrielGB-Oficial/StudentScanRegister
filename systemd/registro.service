@@ -1,5 +1,5 @@
 [Unit]
-Description=Servidor FastAPI - StudentScanRegister (Taller de Redes)
+Description=Servidor FastAPI - StudentScanRegister
 After=network.target
 
 [Service]

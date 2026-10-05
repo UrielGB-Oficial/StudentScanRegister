@@ -53,6 +53,7 @@ class Sesion(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     clase_id: int = Field(foreign_key="clase.id")
     fecha: date = Field(default_factory=date.today)
+    hora_apertura: Optional[time] = Field(default=None)
     clase: Optional[Clase] = Relationship(back_populates="sesiones")
     asistencias: list["Asistencia"] = Relationship(back_populates="sesion")
 

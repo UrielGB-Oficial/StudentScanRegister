@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block titulo %}Asistencia: {{ clase.nombre_clase }} — Taller de Redes{% endblock %}
+{% block titulo %}Asistencia: {{ clase.nombre_clase }} — StudentScanRegister{% endblock %}
 
 {% block contenido %}
 
@@ -13,18 +13,16 @@
         </a>
         <h1>Asistencias — {{ clase.nombre_clase }}</h1>
         <p>
-          {{ alumnos_total }} alumnos · {{ sesiones | length }} sesiones registradas
+          {{ alumnos_total }} alumnos · <span id="contador-sesiones">{{ sesiones | length }}</span> sesiones registradas
           {% if clase.grado or clase.ciclo %}
             · <span class="badge-meta">{% if clase.grado %}{{ clase.grado }}{% endif %}{% if clase.grado and clase.ciclo %} · {% endif %}{% if clase.ciclo %}{{ clase.ciclo }}{% endif %}</span>
           {% endif %}
         </p>
       </div>
       <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
-        {# Botón descargar Excel #}
         <a class="btn btn-secundario" href="/api/asistencias/{{ clase.id }}/excel">
           📥 Descargar Excel
         </a>
-        {# Botón ver alumnos #}
         <a class="btn btn-primario" href="/clases/{{ clase.id }}/alumnos">
           👥 Gestionar alumnos
         </a>
@@ -32,41 +30,45 @@
     </div>
   </div>
 
+  {# ── Ayuda rápida ── #}
+  <div class="ayuda-edicion animate-in">
+    <span>💡 <strong>Doble clic</strong> en ✓ o — para cambiar asistencia &nbsp;·&nbsp; <strong>Clic derecho</strong> en una fecha para opciones</span>
+  </div>
+
   {# ── Tabla de Asistencias ── #}
   {% if filas %}
-    <div class="tabla-wrapper animate-in">
-      <table class="tabla-asistencia">
+    <div class="tabla-wrapper animate-in" id="tabla-wrapper">
+      <table class="tabla-asistencia" id="tabla-asistencia">
         <thead>
           <tr>
-            <th style="width:45px; text-align:center;">#</th>
-            <th style="min-width:60px;">Cód.</th>
-            <th style="min-width:200px;">Nombre del Alumno</th>
-            {# Una columna por cada sesión (fecha) #}
+            <th class="col-fija col-fija-num" style="text-align:center;">#</th>
+            <th class="col-fija col-fija-cod">Cód.</th>
+            <th class="col-fija col-fija-nombre">Nombre del Alumno</th>
+            <th class="col-faltas" style="text-align:center; min-width:70px;">Faltas</th>
             {% for sesion in sesiones %}
-              <th class="col-fecha" title="{{ sesion.fecha }}">
+              <th class="col-fecha th-fecha-editable"
+                  data-sesion-id="{{ sesion.id }}"
+                  data-fecha-iso="{{ sesion.fecha.strftime('%Y-%m-%d') }}"
+                  title="Clic derecho para opciones · {{ sesion.fecha.strftime('%d/%m/%Y') }}"
+                  style="text-align:center; min-width:75px; cursor:context-menu; user-select:none;">
                 {{ sesion.fecha.strftime('%d/%m') }}
               </th>
             {% endfor %}
-            <th class="col-faltas">Faltas</th>
+            {% if not sesiones %}
+              <th style="text-align:center; color:rgba(255,255,255,0.75); font-weight:400; font-size:0.8rem; min-width:160px;">
+                Fechas de registro
+              </th>
+            {% endif %}
           </tr>
         </thead>
-        <tbody>
+        <tbody id="tbody-asistencia">
           {% for fila in filas %}
-            <tr>
-              <td style="text-align:center; font-weight:600; color:var(--texto-suave); font-size:0.85rem;">{{ loop.index }}</td>
-              <td style="font-size:0.8rem; color:var(--texto-suave);">{{ fila.alumno.codigo_alumno }}</td>
-              <td><strong>{{ fila.alumno.nombre_alumno }}</strong></td>
-              {% for asistio in fila.sesiones_asistidas %}
-                <td class="col-centro">
-                  {% if asistio %}
-                    <span class="celda-presente">✓</span>
-                  {% else %}
-                    <span class="celda-falta">—</span>
-                  {% endif %}
-                </td>
-              {% endfor %}
-              {# Columna de Faltas: total de sesiones menos asistencias #}
-              <td class="col-centro">
+            <tr data-alumno-id="{{ fila.alumno.id }}">
+              <td class="col-fija col-fija-num" style="text-align:center; font-weight:600; color:var(--texto-suave); font-size:0.85rem;">{{ loop.index }}</td>
+              <td class="col-fija col-fija-cod" style="font-size:0.8rem; color:var(--texto-suave);">{{ fila.alumno.codigo_alumno }}</td>
+              <td class="col-fija col-fija-nombre"><strong>{{ fila.alumno.nombre_alumno }}</strong></td>
+
+              <td class="col-centro celda-faltas">
                 {% set faltas = (sesiones | length) - fila.total %}
                 {% if faltas > 0 %}
                   <span class="badge-faltas">{{ faltas }}</span>
@@ -74,6 +76,28 @@
                   <span style="color:var(--exito); font-weight:600;">0</span>
                 {% endif %}
               </td>
+
+              {% for i in range(sesiones | length) %}
+                {% set sesion = sesiones[i] %}
+                {% set asistio = fila.sesiones_asistidas[i] %}
+                <td class="col-centro celda-asistencia"
+                    data-sesion-id="{{ sesion.id }}"
+                    data-alumno-id="{{ fila.alumno.id }}"
+                    data-asistio="{{ 'true' if asistio else 'false' }}"
+                    title="Doble clic para cambiar">
+                  {% if asistio %}
+                    <span class="celda-presente">✓</span>
+                  {% else %}
+                    <span class="celda-falta">—</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+
+              {% if not sesiones %}
+                <td class="col-centro" style="color:var(--texto-suave); font-size:0.82rem; font-style:italic;">
+                  Sin fechas aún
+                </td>
+              {% endif %}
             </tr>
           {% endfor %}
         </tbody>
@@ -81,7 +105,6 @@
     </div>
 
   {% else %}
-    {# Estado vacío: sin alumnos o sin sesiones #}
     <div class="card animate-in" style="text-align:center; padding:3rem 2rem;">
       <div style="font-size:3rem; margin-bottom:1rem;">📋</div>
       {% if not sesiones %}
@@ -102,36 +125,65 @@
 
   {# ── Botones de Acción (al pie) ── #}
   <div style="display:flex; gap:0.75rem; margin-top:1.5rem; flex-wrap:wrap;">
-
-    {# Editar grupo #}
-    <button class="btn-icono btn-icono-editar" id="btn-editar-grupo" title="Editar grupo">
-      ✏️
-    </button>
-
-    {# Eliminar grupo #}
-    <button class="btn-icono btn-icono-borrar" id="btn-eliminar-grupo"
-            title="Eliminar grupo" onclick="confirmarEliminar()">
-      🗑️
-    </button>
-
+    <button class="btn-icono btn-icono-editar" id="btn-editar-grupo" title="Editar grupo">✏️</button>
+    <button class="btn-icono btn-icono-borrar" id="btn-eliminar-grupo" title="Eliminar grupo" onclick="confirmarEliminar()">🗑️</button>
   </div>
 
 
-  {# ══════════════════════════════════════════════════════════
-     MODAL: Editar grupo (Nombre, Grado, Ciclo)
-     ══════════════════════════════════════════════════════════ #}
+  {# ══ MENÚ CONTEXTUAL ══════════════════════════════════════════════ #}
+  <div id="ctx-menu" class="ctx-menu">
+    <button class="ctx-item" id="ctx-agregar">➕ Agregar columna</button>
+    <button class="ctx-item" id="ctx-editar-fecha">✏️ Editar fecha</button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item ctx-item-danger" id="ctx-borrar-col">🗑️ Borrar columna</button>
+  </div>
+
+
+  {# ══ MODAL: Agregar / Editar fecha ═══════════════════════════════ #}
+  <div class="modal-overlay" id="modal-fecha">
+    <div class="modal-box animate-in" style="max-width:380px; text-align:left;">
+      <h3 id="modal-fecha-titulo" style="text-align:center;">Agregar columna</h3>
+      <div class="form-group" style="margin-top:1.25rem;">
+        <label for="input-fecha-cal">Selecciona la fecha de la clase</label>
+        <input type="date" id="input-fecha-cal" class="input-date-custom" />
+        <p id="fecha-hint" style="font-size:0.78rem; color:var(--texto-suave); margin-top:0.4rem;">
+          Las columnas se ordenarán automáticamente por fecha.
+        </p>
+      </div>
+      <div class="modal-acciones" style="margin-top:1.25rem;">
+        <button type="button" class="btn btn-secundario" id="btn-cancelar-fecha">Cancelar</button>
+        <button type="button" class="btn btn-primario" id="btn-confirmar-fecha" style="flex:1;">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+
+  {# ══ MODAL: Confirmar borrar columna ═════════════════════════════ #}
+  <div class="modal-overlay" id="modal-borrar-col">
+    <div class="modal-box animate-in" style="max-width:400px;">
+      <h3>¿Borrar esta columna?</h3>
+      <p style="margin-top:0.75rem;">
+        Estás a punto de eliminar la sesión del <strong id="fecha-borrar-label"></strong>.<br/><br/>
+        Esto borrará <strong>todos los registros de asistencia</strong> de esa fecha. <em>No se puede deshacer.</em>
+      </p>
+      <div class="modal-acciones" style="margin-top:1.5rem;">
+        <button class="btn btn-secundario" id="btn-cancelar-borrar-col">Cancelar</button>
+        <button class="btn btn-peligro" id="btn-confirmar-borrar-col">Sí, borrar columna</button>
+      </div>
+    </div>
+  </div>
+
+
+  {# ══ MODAL: Editar grupo ══════════════════════════════════════════ #}
   <div class="modal-overlay" id="modal-editar">
     <div class="modal-box animate-in" style="max-width: 440px; text-align: left;">
       <h3 style="text-align: center;">Editar grupo</h3>
       <form method="POST" action="/clases/{{ clase.id }}/editar">
         <input type="hidden" name="profesor_id" value="{{ clase.profesor_id }}" />
-
         <div class="form-group" style="margin-top:1rem;">
           <label for="nuevo-nombre">Nombre del grupo</label>
-          <input id="nuevo-nombre" name="nombre_clase" type="text"
-                 value="{{ clase.nombre_clase }}" required />
+          <input id="nuevo-nombre" name="nombre_clase" type="text" value="{{ clase.nombre_clase }}" required />
         </div>
-
         <div class="form-row" style="margin-top:0.75rem;">
           <div class="form-group">
             <label for="nuevo-grado">Grado</label>
@@ -144,12 +196,9 @@
           </div>
           <div class="form-group">
             <label for="nuevo-ciclo">Ciclo</label>
-            <input id="nuevo-ciclo" name="ciclo" type="text"
-                   value="{{ clase.ciclo or ciclo_actual }}"
-                   placeholder="Ej. 2026B" required />
+            <input id="nuevo-ciclo" name="ciclo" type="text" value="{{ clase.ciclo or ciclo_actual }}" placeholder="Ej. 2026B" required />
           </div>
         </div>
-
         <div class="modal-acciones" style="margin-top:1.25rem;">
           <button type="button" class="btn btn-secundario" id="btn-cancelar-editar">Cancelar</button>
           <button type="submit" class="btn btn-primario" style="flex:1;">Guardar cambios</button>
@@ -159,9 +208,7 @@
   </div>
 
 
-  {# ══════════════════════════════════════════════════════════
-     MODAL: Confirmación de Eliminar grupo
-     ══════════════════════════════════════════════════════════ #}
+  {# ══ MODAL: Confirmar eliminar grupo ═════════════════════════════ #}
   <div class="modal-overlay" id="modal-confirmar">
     <div class="modal-box">
       <h3>¿Estás seguro?</h3>
@@ -178,21 +225,206 @@
     </div>
   </div>
 
+  {# ── Toast de notificación ── #}
+  <div id="toast-notif" class="toast-notif"></div>
+
 {% endblock %}
 
 
 {% block scripts %}
 <script>
-  // Modal Editar
-  const modalEditar = document.getElementById('modal-editar');
-  document.getElementById('btn-editar-grupo').addEventListener('click', () => modalEditar.classList.add('activo'));
-  document.getElementById('btn-cancelar-editar').addEventListener('click', () => modalEditar.classList.remove('activo'));
-  modalEditar.addEventListener('click', (e) => { if (e.target === modalEditar) modalEditar.classList.remove('activo'); });
+  var CLASE_ID = {{ clase.id }};
 
-  // Modal Confirmar Eliminar
-  const modalConfirmar = document.getElementById('modal-confirmar');
+  function mostrarToast(msg, tipo) {
+    tipo = tipo || 'ok';
+    var toast = document.getElementById('toast-notif');
+    toast.textContent = msg;
+    toast.className = 'toast-notif toast-' + tipo + ' visible';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function() { toast.classList.remove('visible'); }, 2800);
+  }
+
+  function isoADisplay(iso) {
+    var p = iso.split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+
+  function recalcularFaltas(tr) {
+    var celdas = tr.querySelectorAll('.celda-asistencia');
+    var totalSesiones = document.querySelectorAll('.th-fecha-editable').length;
+    var asistencias = 0;
+    celdas.forEach(function(c) { if (c.dataset.asistio === 'true') asistencias++; });
+    var faltas = totalSesiones - asistencias;
+    var cf = tr.querySelector('.celda-faltas');
+    cf.innerHTML = faltas > 0
+      ? '<span class="badge-faltas">' + faltas + '</span>'
+      : '<span style="color:var(--exito); font-weight:600;">0</span>';
+  }
+
+  // Toggle doble clic
+  document.addEventListener('dblclick', function(e) {
+    var td = e.target.closest('.celda-asistencia');
+    if (!td) return;
+    var sesionId = parseInt(td.dataset.sesionId);
+    var alumnoId = parseInt(td.dataset.alumnoId);
+    td.style.opacity = '0.4';
+    td.style.pointerEvents = 'none';
+    fetch('/api/asistencias/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sesion_id: sesionId, alumno_id: alumnoId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      td.dataset.asistio = data.asistio ? 'true' : 'false';
+      td.innerHTML = data.asistio
+        ? '<span class="celda-presente" title="Doble clic para cambiar">✓</span>'
+        : '<span class="celda-falta" title="Doble clic para cambiar">—</span>';
+      recalcularFaltas(td.closest('tr'));
+      mostrarToast(data.asistio ? '✓ Asistencia registrada' : '— Asistencia eliminada', data.asistio ? 'ok' : 'warn');
+    })
+    .catch(function() { mostrarToast('Error de conexión', 'error'); })
+    .finally(function() { td.style.opacity = ''; td.style.pointerEvents = ''; });
+  });
+
+  // Menú contextual
+  var ctxMenu = document.getElementById('ctx-menu');
+  var ctxSesionId = null, ctxFechaIso = null, ctxModoEditar = false;
+
+  function cerrarMenu() {
+    ctxMenu.classList.remove('visible');
+    ctxSesionId = null; ctxFechaIso = null;
+  }
+
+  document.addEventListener('contextmenu', function(e) {
+    var th = e.target.closest('.th-fecha-editable');
+    if (!th) { cerrarMenu(); return; }
+    e.preventDefault();
+    ctxSesionId = parseInt(th.dataset.sesionId);
+    ctxFechaIso = th.dataset.fechaIso;
+    var menuW = 210, menuH = 140;
+    var x = Math.min(e.clientX, window.innerWidth - menuW) + window.scrollX;
+    var y = Math.min(e.clientY, window.innerHeight - menuH) + window.scrollY;
+    ctxMenu.style.left = x + 'px';
+    ctxMenu.style.top = y + 'px';
+    ctxMenu.classList.add('visible');
+  });
+
+  document.addEventListener('click', function(e) { if (!ctxMenu.contains(e.target)) cerrarMenu(); });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cerrarMenu(); });
+
+  var modalFecha = document.getElementById('modal-fecha');
+
+  document.getElementById('ctx-agregar').addEventListener('click', function() {
+    cerrarMenu();
+    ctxModoEditar = false;
+    document.getElementById('modal-fecha-titulo').textContent = 'Agregar columna';
+    document.getElementById('input-fecha-cal').value = '';
+    document.getElementById('fecha-hint').textContent = 'Las columnas se ordenarán automáticamente por fecha.';
+    document.getElementById('btn-confirmar-fecha').textContent = 'Agregar columna';
+    modalFecha.classList.add('activo');
+  });
+
+  document.getElementById('ctx-editar-fecha').addEventListener('click', function() {
+    cerrarMenu();
+    ctxModoEditar = true;
+    document.getElementById('modal-fecha-titulo').textContent = 'Editar fecha';
+    document.getElementById('input-fecha-cal').value = ctxFechaIso || '';
+    document.getElementById('fecha-hint').textContent = 'La columna se reubicará según la nueva fecha.';
+    document.getElementById('btn-confirmar-fecha').textContent = 'Guardar fecha';
+    modalFecha.classList.add('activo');
+  });
+
+  var sesionIdParaBorrar = null;
+  document.getElementById('ctx-borrar-col').addEventListener('click', function() {
+    sesionIdParaBorrar = ctxSesionId;
+    document.getElementById('fecha-borrar-label').textContent = isoADisplay(ctxFechaIso);
+    cerrarMenu();
+    document.getElementById('modal-borrar-col').classList.add('activo');
+  });
+
+  document.getElementById('btn-cancelar-fecha').addEventListener('click', function() { modalFecha.classList.remove('activo'); });
+  modalFecha.addEventListener('click', function(e) { if (e.target === modalFecha) modalFecha.classList.remove('activo'); });
+
+  document.getElementById('btn-confirmar-fecha').addEventListener('click', function() {
+    var fechaVal = document.getElementById('input-fecha-cal').value;
+    if (!fechaVal) { mostrarToast('Selecciona una fecha', 'warn'); return; }
+    modalFecha.classList.remove('activo');
+
+    if (ctxModoEditar) {
+      var sesId = ctxSesionId;
+      fetch('/api/sesiones/' + sesId + '/editar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha: fechaVal })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.status === 'ok') { mostrarToast('Fecha actualizada. Recargando…', 'ok'); setTimeout(function() { location.reload(); }, 800); }
+        else { mostrarToast(data.detail || 'Error al editar fecha', 'error'); }
+      })
+      .catch(function() { mostrarToast('Error de conexión', 'error'); });
+    } else {
+      fetch('/api/sesiones/agregar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clase_id: CLASE_ID, fecha: fechaVal })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.status === 'ok') {
+          if (!data.nueva) { mostrarToast('Ya existe una sesión en esa fecha', 'warn'); }
+          else { mostrarToast('Columna agregada. Recargando…', 'ok'); setTimeout(function() { location.reload(); }, 800); }
+        } else { mostrarToast(data.detail || 'Error al agregar columna', 'error'); }
+      })
+      .catch(function() { mostrarToast('Error de conexión', 'error'); });
+    }
+  });
+
+  var modalBorrarCol = document.getElementById('modal-borrar-col');
+  document.getElementById('btn-cancelar-borrar-col').addEventListener('click', function() { modalBorrarCol.classList.remove('activo'); });
+  modalBorrarCol.addEventListener('click', function(e) { if (e.target === modalBorrarCol) modalBorrarCol.classList.remove('activo'); });
+
+  document.getElementById('btn-confirmar-borrar-col').addEventListener('click', function() {
+    var btn = this;
+    btn.disabled = true;
+    modalBorrarCol.classList.remove('activo');
+    fetch('/api/sesiones/' + sesionIdParaBorrar, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status === 'ok') { mostrarToast('Columna eliminada. Recargando…', 'ok'); setTimeout(function() { location.reload(); }, 800); }
+      else { mostrarToast(data.detail || 'Error al eliminar', 'error'); btn.disabled = false; }
+    })
+    .catch(function() { mostrarToast('Error de conexión', 'error'); btn.disabled = false; });
+  });
+
+  var modalEditar = document.getElementById('modal-editar');
+  document.getElementById('btn-editar-grupo').addEventListener('click', function() { modalEditar.classList.add('activo'); });
+  document.getElementById('btn-cancelar-editar').addEventListener('click', function() { modalEditar.classList.remove('activo'); });
+  modalEditar.addEventListener('click', function(e) { if (e.target === modalEditar) modalEditar.classList.remove('activo'); });
+
+  var modalConfirmar = document.getElementById('modal-confirmar');
   function confirmarEliminar() { modalConfirmar.classList.add('activo'); }
-  document.getElementById('btn-cancelar-eliminar').addEventListener('click', () => modalConfirmar.classList.remove('activo'));
-  modalConfirmar.addEventListener('click', (e) => { if (e.target === modalConfirmar) modalConfirmar.classList.remove('activo'); });
+  document.getElementById('btn-cancelar-eliminar').addEventListener('click', function() { modalConfirmar.classList.remove('activo'); });
+  modalConfirmar.addEventListener('click', function(e) { if (e.target === modalConfirmar) modalConfirmar.classList.remove('activo'); });
+
+  // Drag to scroll
+  var tw = document.getElementById('tabla-wrapper');
+  if (tw) {
+    var isDrg = false, stX, scL;
+    tw.addEventListener('mousedown', function(e) {
+      if (e.target.closest('button,a,input') || e.button !== 0) return;
+      isDrg = true; tw.style.cursor = 'grabbing'; tw.style.userSelect = 'none';
+      stX = e.pageX - tw.offsetLeft; scL = tw.scrollLeft;
+    });
+    window.addEventListener('mouseup', function() {
+      if (isDrg) { isDrg = false; tw.style.cursor = ''; tw.style.userSelect = ''; }
+    });
+    tw.addEventListener('mousemove', function(e) {
+      if (!isDrg) return; e.preventDefault();
+      tw.scrollLeft = scL - (e.pageX - tw.offsetLeft - stX) * 1.5;
+    });
+  }
 </script>
 {% endblock %}
+

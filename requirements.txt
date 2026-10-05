@@ -26,4 +26,4 @@ uvicorn==0.52.4
 watchfiles==1.2.0
 websockets==17.0.1
 itsdangerous>=2.1.2
-evdev>=1.7.0
+evdev>=1.7.0; sys_platform == 'linux'

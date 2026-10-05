@@ -22,6 +22,16 @@ import time
 import urllib.error
 import urllib.request
 
+# En Windows la consola puede usar cp1252 que no soporta acentos ni emojis.
+# Reconfiguramos stdout/stderr para usar UTF-8 y evitar UnicodeEncodeError.
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        # Python < 3.7 no tiene reconfigure; intentamos con PYTHONIOENCODING
+        pass
+
 # ─────────────────────────────────────────────────────────────
 # Configuración
 # ─────────────────────────────────────────────────────────────
@@ -62,30 +72,45 @@ def enviar_escaneo(codigo: str) -> dict:
 def mostrar_resultado(respuesta: dict, codigo: str):
     """
     Imprime en consola el resultado con formato claro y legible.
+    Compatible con consola Windows (cp1252) — sin emojis.
     """
     status = respuesta.get("status", "error")
     tipo = respuesta.get("tipo", "desconocido")
     mensaje = respuesta.get("mensaje", "")
     hora_str = time.strftime("%H:%M:%S")
 
-    print("─" * 60)
-    print(f"[{hora_str}] Código recibido: {codigo}")
+    linea = "-" * 60
+    try:
+        print(linea)
+        print(f"[{hora_str}] Codigo: {codigo}")
 
-    if status == "ok":
-        if tipo == "profesor":
-            nombre = respuesta.get("nombre", "")
-            print(f"  👨‍🏫 [PROFESOR LISTO] {nombre}")
+        if status == "ok":
+            if tipo == "profesor":
+                nombre = respuesta.get("nombre", "")
+                print(f"  [PROFESOR LISTO] {nombre}")
+                print(f"     {mensaje}")
+            elif tipo == "alumno":
+                nombre = respuesta.get("nombre", "")
+                clase = respuesta.get("clase", "")
+                print(f"  [OK] ASISTENCIA REGISTRADA: {nombre} ({clase})")
+                print(f"     {mensaje}")
+        else:
+            print(f"  [ERROR] ({tipo})")
             print(f"     {mensaje}")
-        elif tipo == "alumno":
-            nombre = respuesta.get("nombre", "")
-            clase = respuesta.get("clase", "")
-            print(f"  ✅ [ASISTENCIA REGISTRADA] {nombre} ({clase})")
-            print(f"     {mensaje}")
-    else:
-        print(f"  ⚠️  [ATENCIÓN / ERROR] ({tipo})")
-        print(f"     {mensaje}")
 
-    print("─" * 60)
+        print(linea)
+    except UnicodeEncodeError:
+        # Si la consola no puede mostrar algun caracter, usamos encode seguro
+        try:
+            safe_msg = mensaje.encode('ascii', errors='replace').decode('ascii')
+            safe_nombre = respuesta.get('nombre', '').encode('ascii', errors='replace').decode('ascii')
+            print(linea)
+            print(f"[{hora_str}] Status: {status} | Tipo: {tipo}")
+            print(f"  Nombre: {safe_nombre}")
+            print(f"  Msg: {safe_msg}")
+            print(linea)
+        except Exception:
+            print(f"[{hora_str}] Scan OK: status={status}, tipo={tipo}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -178,16 +203,20 @@ def ejecutar_modo_evdev():
 # ─────────────────────────────────────────────────────────────
 def ejecutar_modo_simulacion():
     print("=" * 60)
-    print("  MODO SIMULADOR DE ESCÁNER (Entorno sin evdev / Windows)")
+    print("  MODO LECTOR DE CODIGOS (Windows / Sin evdev)")
     print(f"  Enviando peticiones a: {API_URL}")
-    print("  Escribe un código y presiona ENTER (o escanea si tu lector")
-    print("  funciona como teclado en esta ventana).")
+    print("  Escribe o escanea un codigo y presiona ENTER.")
     print("  Presiona Ctrl+C para salir.")
     print("=" * 60)
 
     try:
         while True:
-            codigo = input("\n[Escanear código] > ").strip()
+            try:
+                codigo = input("\n[Scan] > ").strip()
+            except UnicodeDecodeError:
+                print("[WARN] Error de codificacion al leer el codigo. Intenta de nuevo.")
+                continue
+
             if not codigo:
                 continue
 
@@ -195,7 +224,7 @@ def ejecutar_modo_simulacion():
             mostrar_resultado(res, codigo)
 
     except KeyboardInterrupt:
-        print("\nSimulador detenido. ¡Hasta luego!")
+        print("\nLector detenido.")
 
 
 # ─────────────────────────────────────────────────────────────

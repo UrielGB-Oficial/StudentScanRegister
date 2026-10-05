@@ -1,5 +1,5 @@
 /* ================================================================
-   style.css — Sistema de Registro de Asistencias | Taller de Redes
+   style.css — Sistema de Registro de Asistencias | StudentScanRegister
    Paleta del wireframe:
      #3368A0  → Azul oscuro principal
      #66A3BF  → Azul medio
@@ -55,9 +55,19 @@ nav .nav-brand {
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
-nav .nav-brand span { opacity: 0.7; font-weight: 400; }
+nav .nav-brand img,
+.nav-logo {
+  height: 28px !important;
+  max-height: 28px !important;
+  width: auto !important;
+  max-width: 60px !important;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+}
+nav .nav-brand span { opacity: 0.95; font-weight: 600; letter-spacing: 0.02em; }
 nav .nav-links { display: flex; align-items: center; gap: 1rem; }
 nav .nav-links a {
   color: var(--azul-claro);
@@ -232,10 +242,36 @@ nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco
 .btn-icono-reset:hover { background: var(--exito); color: var(--blanco); }
 
 /* ── Tabla de Asistencias ──────────────────────────────────── */
-.tabla-wrapper { overflow-x: auto; border-radius: var(--radio); box-shadow: var(--sombra-card); }
+.tabla-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-card);
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: var(--azul-medio) #e2e8f0;
+}
+
+/* Barra de desplazamiento horizontal visible y estilizada para el ratón */
+.tabla-wrapper::-webkit-scrollbar {
+  height: 11px;
+}
+.tabla-wrapper::-webkit-scrollbar-track {
+  background: #edf2f7;
+  border-radius: 8px;
+}
+.tabla-wrapper::-webkit-scrollbar-thumb {
+  background: var(--azul-medio);
+  border-radius: 8px;
+  border: 2px solid #edf2f7;
+}
+.tabla-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--azul-oscuro);
+}
+
 .tabla-asistencia {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: var(--blanco);
   font-size: 0.88rem;
 }
@@ -248,12 +284,13 @@ nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco
   white-space: nowrap;
   position: sticky;
   top: 0;
+  z-index: 1;
 }
 .tabla-asistencia th.col-fecha {
   text-align: center;
   font-size: 0.78rem;
-  padding: 0.75rem 0.5rem;
-  min-width: 60px;
+  padding: 0.75rem 0.6rem;
+  min-width: 65px;
 }
 .tabla-asistencia th.col-faltas {
   background: #4a3b6b;
@@ -262,20 +299,61 @@ nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco
 .tabla-asistencia td {
   padding: 0.65rem 1rem;
   border-bottom: 1px solid #eef2f5;
+  white-space: nowrap;
 }
 .tabla-asistencia tr:last-child td { border-bottom: none; }
 .tabla-asistencia tr:hover td { background: #f5f8fb; }
 .tabla-asistencia td.col-centro { text-align: center; }
 
+/* ── Columnas Fijas a la izquierda (Inmovilizar paneles como en Excel) ── */
+.tabla-asistencia th.col-fija {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: var(--azul-oscuro);
+}
+.tabla-asistencia td.col-fija {
+  position: sticky;
+  z-index: 6;
+  background: var(--blanco);
+}
+.tabla-asistencia tr:hover td.col-fija {
+  background: #f5f8fb;
+}
+.tabla-asistencia .col-fija-num {
+  left: 0;
+  width: 48px;
+  min-width: 48px;
+}
+.tabla-asistencia .col-fija-cod {
+  left: 48px;
+  min-width: 75px;
+}
+.tabla-asistencia .col-fija-nombre {
+  left: 123px;
+  min-width: 220px;
+  border-right: 2px solid var(--azul-claro);
+  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.07);
+}
+
 /* Celda de asistencia: presente o falta */
 .celda-presente {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--exito);
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
 }
 .celda-falta {
-  color: #c0c8d0;
-  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1;
 }
 .badge-faltas {
   display: inline-block;
@@ -312,6 +390,20 @@ nav .nav-links a:hover { background: rgba(255,255,255,0.12); color: var(--blanco
   width: 100%;
   max-width: 360px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.login-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+.login-logo-img {
+  height: 54px !important;
+  max-height: 54px !important;
+  width: auto !important;
+  max-width: 120px !important;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(51, 104, 160, 0.25));
 }
 .login-logo {
   width: 60px; height: 60px;
@@ -598,6 +690,135 @@ select.form-input:focus,
 }
 
 
+/* ── Barra de ayuda de edición ─────────────────────────────── */
+.ayuda-edicion {
+  background: linear-gradient(90deg, #eef4fb 0%, #f5f8fc 100%);
+  border: 1px solid #d0e2f4;
+  border-radius: var(--radio-sm);
+  padding: 0.6rem 1rem;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+  margin-bottom: 1.25rem;
+}
 
+/* ── Menú contextual (clic derecho en fecha) ───────────────── */
+.ctx-menu {
+  position: fixed;
+  z-index: 9000;
+  background: #fff;
+  border: 1px solid #d0dce8;
+  border-radius: var(--radio-sm);
+  box-shadow: 0 8px 28px rgba(51,104,160,0.18);
+  min-width: 210px;
+  padding: 0.35rem 0;
+  display: none;
+  animation: fadeInUp 0.15s ease both;
+}
+.ctx-menu.visible { display: block; }
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.55rem 1rem;
+  background: none;
+  border: none;
+  font-size: 0.88rem;
+  color: var(--texto);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+  font-family: inherit;
+}
+.ctx-item:hover { background: #eef4fb; color: var(--azul-oscuro); }
+.ctx-item-danger { color: var(--error) !important; }
+.ctx-item-danger:hover { background: #fce8e8 !important; color: var(--error) !important; }
+.ctx-separator {
+  height: 1px;
+  background: #e8eef4;
+  margin: 0.25rem 0;
+}
 
+/* ── Toast de notificación ─────────────────────────────────── */
+.toast-notif {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 9999;
+  background: var(--azul-oscuro);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radio-sm);
+  font-size: 0.88rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+  max-width: 320px;
+}
+.toast-notif.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast-notif.toast-ok { background: var(--exito); }
+.toast-notif.toast-warn { background: #b45309; }
+.toast-notif.toast-error { background: var(--error); }
+
+/* ── Celdas de asistencia con efecto hover ─────────────────── */
+.celda-asistencia {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.celda-asistencia:hover {
+  background: #e8f0fa !important;
+}
+.celda-asistencia .celda-presente,
+.celda-asistencia .celda-falta {
+  transition: transform 0.15s;
+}
+.celda-asistencia:hover .celda-presente,
+.celda-asistencia:hover .celda-falta {
+  transform: scale(1.25);
+}
+
+/* ── Cabecera de fecha: resaltado en hover ─────────────────── */
+.th-fecha-editable {
+  position: relative;
+}
+.th-fecha-editable:hover {
+  background: #2a578a !important;
+}
+.th-fecha-editable::after {
+  content: '⋮';
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.85rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: rgba(255,255,255,0.7);
+}
+.th-fecha-editable:hover::after { opacity: 1; }
+
+/* ── Input type date estilizado ────────────────────────────── */
+.input-date-custom {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 1.5px solid var(--azul-claro);
+  border-radius: var(--radio-sm);
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: var(--texto);
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  cursor: pointer;
+}
+.input-date-custom:focus {
+  border-color: var(--azul-oscuro);
+  box-shadow: 0 0 0 3px rgba(51,104,160,0.12);
+}
 

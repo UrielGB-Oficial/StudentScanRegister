@@ -39,8 +39,8 @@ async def lifespan(app: FastAPI):
 # Pruébalo: cuando el servidor esté corriendo, abre http://localhost:8000/docs
 # Verás TODOS tus endpoints documentados automáticamente. Esto no existía en PHP.
 app = FastAPI(
-    title="Student Scan Register",
-    description="Taller de Redes — Registro via lector de código de barras",
+    title="StudentScanRegister",
+    description="StudentScanRegister — Sistema de Asistencias via lector de código de barras",
     version="1.0.0",
     lifespan=lifespan,
 )

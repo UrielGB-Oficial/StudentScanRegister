@@ -3,15 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block titulo %}Taller de Redes{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <title>{% block titulo %}StudentScanRegister{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="icon" type="image/png" href="/static/logo.png" />
 </head>
 <body>
 
   {# ── Barra de Navegación ── #}
   <nav>
     <a class="nav-brand" href="/clases">
-      📡 <span>Taller de Redes</span>
+      <img src="/static/logo.png" alt="StudentScanRegister" class="nav-logo" style="height: 28px; max-height: 28px; width: auto; max-width: 60px; object-fit: contain; display: inline-block; vertical-align: middle;" />
+      <span>StudentScanRegister</span>
     </a>
     <div class="nav-links">
       <a href="/clases">Mis Grupos</a>

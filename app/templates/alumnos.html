@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block titulo %}Alumnos: {{ clase.nombre_clase }} — Taller de Redes{% endblock %}
+{% block titulo %}Alumnos: {{ clase.nombre_clase }} — StudentScanRegister{% endblock %}
 
 {% block contenido %}
 
@@ -23,7 +23,7 @@
 </div>
 
 {# ── Acciones superiores ── #}
-<div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;" class="animate-in">
+<div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap; align-items:center;" class="animate-in">
   <a href="/clases/{{ clase.id }}/asistencia" class="btn btn-secundario" style="font-weight:600;">
     ← Regresar
   </a>
