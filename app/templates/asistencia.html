@@ -19,7 +19,17 @@
           {% endif %}
         </p>
       </div>
-      <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+        {% if sesion_hoy %}
+          <div class="badge-sesion-activa" id="badge-sesion-estado" title="La sesión de hoy ya está abierta y lista para registrar asistencias">
+            <span class="punto-verde-pulsante"></span>
+            <span>Sesión de hoy activa ({{ fecha_hoy_str }})</span>
+          </div>
+        {% else %}
+          <button type="button" class="btn btn-exito" id="btn-abrir-sesion-hoy" onclick="abrirSesionHoy()" title="Crea la sesión de hoy sin necesidad de escanear primero al profesor">
+            🟢 Abrir sesión de hoy ({{ fecha_hoy_str }})
+          </button>
+        {% endif %}
         <a class="btn btn-secundario" href="/api/asistencias/{{ clase.id }}/excel">
           📥 Descargar Excel
         </a>
@@ -30,9 +40,24 @@
     </div>
   </div>
 
+  {# ── Barra de Escaneo en Vivo ── #}
+  <div class="barra-escaner animate-in">
+    <div class="escaner-indicador">
+      <span style="font-size:1.2rem;">📡</span>
+      <div>
+        <span style="font-weight:600; color:var(--texto);">Lector QR / Código de Barras</span>
+        <small style="display:block; font-size:0.75rem; color:var(--texto-suave);">Listo para escanear en cualquier momento</small>
+      </div>
+    </div>
+    <div class="escaner-input-wrap">
+      <input type="text" id="input-escaner-manual" placeholder="Pasa el lector o escribe el código..." autocomplete="off" />
+      <button type="button" class="btn btn-primario" id="btn-escanear-manual">Registrar</button>
+    </div>
+  </div>
+
   {# ── Ayuda rápida ── #}
   <div class="ayuda-edicion animate-in">
-    <span>💡 <strong>Doble clic</strong> en ✓ o — para cambiar asistencia &nbsp;·&nbsp; <strong>Clic derecho</strong> en una fecha para opciones</span>
+    <span>💡 <strong>Escanea</strong> con el lector USB en pantalla o escribe el código · <strong>Doble clic</strong> en ✓ o — para editar manual · <strong>Clic derecho</strong> en fecha para opciones</span>
   </div>
 
   {# ── Tabla de Asistencias ── #}
@@ -425,6 +450,220 @@
       tw.scrollLeft = scL - (e.pageX - tw.offsetLeft - stX) * 1.5;
     });
   }
+
+  // ══════════════════════════════════════════════════════════
+  // SISTEMA DE ESCÁNER EN VIVO Y CONTROL DE SESIÓN
+  // ══════════════════════════════════════════════════════════
+
+  // 1. Abrir sesión de hoy con botón
+  function abrirSesionHoy() {
+    var btn = document.getElementById('btn-abrir-sesion-hoy');
+    if (btn) btn.disabled = true;
+    mostrarToast('Abriendo sesión de hoy…', 'ok');
+
+    fetch('/api/sesiones/' + CLASE_ID + '/abrir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status === 'ok') {
+        emitirBeep(true);
+        mostrarToast(data.mensaje || 'Sesión de hoy abierta', 'ok');
+        setTimeout(function() { location.reload(); }, 600);
+      } else {
+        emitirBeep(false);
+        mostrarToast(data.detail || 'Error al abrir sesión', 'error');
+        if (btn) btn.disabled = false;
+      }
+    })
+    .catch(function() {
+      mostrarToast('Error de conexión', 'error');
+      if (btn) btn.disabled = false;
+    });
+  }
+
+  // 2. Beep sonoro sintético con Web Audio API (100% offline)
+  function emitirBeep(exito) {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var ctx = new AudioCtx();
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      if (exito) {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.07);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.22);
+      } else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+      }
+    } catch (e) {}
+  }
+
+  // 3. Marcar asistencia en la tabla visualmente
+  function marcarAsistenciaEnTabla(alumnoId, sesionId) {
+    var tr = document.querySelector('tr[data-alumno-id="' + alumnoId + '"]');
+    if (!tr) {
+      // Si la fila no se encuentra en esta clase, recargar para refrescar datos
+      setTimeout(function() { location.reload(); }, 600);
+      return;
+    }
+
+    var td = tr.querySelector('.celda-asistencia[data-sesion-id="' + sesionId + '"]');
+    if (!td) {
+      // Si la columna de hoy aún no estaba renderizada, recargar para mostrarla
+      setTimeout(function() { location.reload(); }, 600);
+      return;
+    }
+
+    td.dataset.asistio = 'true';
+    td.innerHTML = '<span class="celda-presente" title="Doble clic para cambiar">✓</span>';
+    recalcularFaltas(tr);
+
+    // Efecto visual de resaltado
+    tr.classList.remove('fila-resaltada');
+    void tr.offsetWidth; // Forzar reflow
+    tr.classList.add('fila-resaltada');
+    setTimeout(function() { tr.classList.remove('fila-resaltada'); }, 2200);
+
+    // Scroll suave a la fila si es necesario
+    tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // 4. Procesar escaneo (Profesor o Alumno)
+  function procesarEscaneoWeb(codigo) {
+    if (!codigo) return;
+    codigo = codigo.trim();
+    if (!codigo) return;
+
+    fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigo: codigo, clase_id: CLASE_ID })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status === 'ok') {
+        emitirBeep(true);
+        mostrarToast(data.mensaje || 'Escaneo procesado correctamente', 'ok');
+
+        if (data.tipo === 'profesor') {
+          setTimeout(function() { location.reload(); }, 700);
+        } else if (data.tipo === 'alumno') {
+          marcarAsistenciaEnTabla(data.alumno_id, data.sesion_id);
+        }
+      } else {
+        emitirBeep(false);
+        mostrarToast(data.mensaje || 'Error al procesar escaneo', 'error');
+      }
+    })
+    .catch(function() {
+      mostrarToast('Error de conexión con el servidor', 'error');
+    });
+  }
+
+  // 5. Input manual de escaneo
+  var inputManual = document.getElementById('input-escaner-manual');
+  var btnManual = document.getElementById('btn-escanear-manual');
+  if (btnManual && inputManual) {
+    btnManual.addEventListener('click', function() {
+      var val = inputManual.value.trim();
+      if (val) {
+        procesarEscaneoWeb(val);
+        inputManual.value = '';
+      }
+    });
+    inputManual.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var val = inputManual.value.trim();
+        if (val) {
+          procesarEscaneoWeb(val);
+          inputManual.value = '';
+        }
+      }
+    });
+  }
+
+  // 6. Interceptor global de hardware USB para lectores de código de barras
+  var bufferUsb = '';
+  var tiempoUltimaPulsacion = 0;
+
+  window.addEventListener('keydown', function(e) {
+    var target = e.target;
+    var esInputManual = target && target.id === 'input-escaner-manual';
+    var esOtroInput = target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') && !esInputManual;
+    if (esOtroInput) return; // Permitir escribir en modales sin interferencia
+
+    var ahora = Date.now();
+    // Los lectores USB envían las teclas en ráfagas menores a 60ms
+    if (ahora - tiempoUltimaPulsacion > 200) {
+      bufferUsb = '';
+    }
+    tiempoUltimaPulsacion = ahora;
+
+    if (e.key === 'Enter') {
+      var codigoFinal = bufferUsb.trim();
+      bufferUsb = '';
+      if (codigoFinal.length >= 2) {
+        e.preventDefault();
+        if (inputManual) inputManual.value = codigoFinal;
+        procesarEscaneoWeb(codigoFinal);
+      }
+    } else if (e.key.length === 1) {
+      bufferUsb += e.key;
+    }
+  });
+
+  // 7. Polling de sincronización periódica (para lectores corriendo en consola o Raspberry)
+  var sesionHoyConocida = {% if sesion_hoy %}true{% else %}false{% endif %};
+  setInterval(function() {
+    fetch('/api/sesiones/hoy/' + CLASE_ID)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data) return;
+
+      // Si la sesión de hoy no estaba abierta y ahora sí lo está, recargamos
+      if (!sesionHoyConocida && data.abierta) {
+        location.reload();
+        return;
+      }
+
+      // Si ya hay sesión abierta hoy, sincronizar las asistencias en pantalla
+      if (data.abierta && data.sesion_id && Array.isArray(data.asistencias)) {
+        var nuevas = 0;
+        data.asistencias.forEach(function(alId) {
+          var tr = document.querySelector('tr[data-alumno-id="' + alId + '"]');
+          if (tr) {
+            var td = tr.querySelector('.celda-asistencia[data-sesion-id="' + data.sesion_id + '"]');
+            if (td && td.dataset.asistio !== 'true') {
+              td.dataset.asistio = 'true';
+              td.innerHTML = '<span class="celda-presente" title="Doble clic para cambiar">✓</span>';
+              recalcularFaltas(tr);
+              nuevas++;
+            }
+          }
+        });
+        if (nuevas > 0) {
+          mostrarToast('Se sincronizaron ' + nuevas + ' asistencias', 'ok');
+        }
+      }
+    })
+    .catch(function() {});
+  }, 3500);
+
 </script>
 {% endblock %}
 

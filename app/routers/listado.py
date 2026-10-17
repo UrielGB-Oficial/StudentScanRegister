@@ -224,6 +224,10 @@ def ver_matriz_asistencia(
             "total": total,
         })
 
+    from datetime import date
+    hoy = date.today()
+    sesion_hoy = next((s for s in sesiones if s.fecha == hoy), None)
+
     return templates.TemplateResponse(
         request=request,
         name="asistencia.html",
@@ -234,5 +238,7 @@ def ver_matriz_asistencia(
             "alumnos_total": len(alumnos),
             "grados": GRADOS_VALIDOS,
             "ciclo_actual": obtener_ciclo_actual(),
+            "sesion_hoy": sesion_hoy,
+            "fecha_hoy_str": hoy.strftime("%d/%m/%Y"),
         },
     )

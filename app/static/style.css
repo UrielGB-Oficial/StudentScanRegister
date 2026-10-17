@@ -822,3 +822,108 @@ select.form-input:focus,
   box-shadow: 0 0 0 3px rgba(51,104,160,0.12);
 }
 
+/* ── Barra de Escáner y Estado de Sesión en Vivo ────────────── */
+.barra-escaner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background: var(--blanco);
+  border: 1.5px solid var(--azul-claro);
+  border-radius: var(--radio-sm);
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--sombra-card);
+}
+
+.escaner-indicador {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.escaner-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  max-width: 420px;
+}
+
+.escaner-input-wrap input {
+  flex: 1;
+  padding: 0.5rem 0.85rem;
+  border: 1.5px solid var(--azul-claro);
+  border-radius: var(--radio-sm);
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--transicion), box-shadow var(--transicion);
+}
+
+.escaner-input-wrap input:focus {
+  border-color: var(--azul-oscuro);
+  box-shadow: 0 0 0 3px rgba(51,104,160,0.15);
+}
+
+.btn-exito {
+  background: #2E7D52;
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(46, 125, 82, 0.25);
+}
+
+.btn-exito:hover {
+  background: #246341;
+  box-shadow: 0 4px 14px rgba(46, 125, 82, 0.35);
+}
+
+.badge-sesion-activa {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: #eaf6ee;
+  color: #2E7D52;
+  border: 1.5px solid #a3dcba;
+  padding: 0.45rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.punto-verde-pulsante {
+  width: 9px;
+  height: 9px;
+  background-color: #2E7D52;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 0 rgba(46, 125, 82, 0.7);
+  animation: pulsoVerde 1.8s infinite;
+}
+
+@keyframes pulsoVerde {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(46, 125, 82, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(46, 125, 82, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(46, 125, 82, 0);
+  }
+}
+
+/* Fila recién escaneada con animación de highlight */
+.fila-resaltada td {
+  background-color: #d1fae5 !important;
+  transition: background-color 0.8s ease;
+}
+
+

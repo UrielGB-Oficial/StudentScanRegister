@@ -81,6 +81,7 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
         }
         print(f"  [PROFESOR] Identificado: {profesor.nombre_profesor} (ID: {profesor.id})")
 
+        clase_abierta_id = None
         # Si se envió clase_id desde la interfaz web, abrimos la sesión de esa clase de inmediato
         if datos.clase_id:
             clase_web = session.get(Clase, datos.clase_id)
@@ -93,11 +94,29 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
                     session.commit()
                     session.refresh(ses_activa)
                     print(f"  [SESION] Creada de inmediato para clase: {clase_web.nombre_clase}")
+                clase_abierta_id = datos.clase_id
+        else:
+            # Si no vino clase_id pero el profesor tiene solo 1 clase registrada, auto-abrimos su sesión de hoy
+            stmt_clases = select(Clase).where(Clase.profesor_id == profesor.id)
+            clases_prof = session.exec(stmt_clases).all()
+            if len(clases_prof) == 1:
+                c_unica = clases_prof[0]
+                stmt_ses = select(Sesion).where(Sesion.clase_id == c_unica.id, Sesion.fecha == hoy)
+                ses_activa = session.exec(stmt_ses).first()
+                if not ses_activa:
+                    ses_activa = Sesion(clase_id=c_unica.id, fecha=hoy, hora_apertura=hora_actual)
+                    session.add(ses_activa)
+                    session.commit()
+                    session.refresh(ses_activa)
+                    print(f"  [SESION] Auto-creada para la única clase: {c_unica.nombre_clase}")
+                clase_abierta_id = c_unica.id
 
         return {
             "status": "ok",
             "tipo": "profesor",
+            "profesor_id": profesor.id,
             "nombre": profesor.nombre_profesor,
+            "clase_id": clase_abierta_id,
             "mensaje": f"Profesor {profesor.nombre_profesor} listo. Registro de asistencia abierto.",
         }
 
@@ -123,6 +142,11 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
                     alumno_elegido = al
                     clase = session.get(Clase, al.clase_id)
                     break
+
+        # Si no se envió clase_id pero el alumno solo está en una clase, asignarlo directamente
+        if not alumno_elegido and len(alumnos_encontrados) == 1:
+            alumno_elegido = alumnos_encontrados[0]
+            clase = session.get(Clase, alumno_elegido.clase_id)
 
         # 1. Si hay un profesor en espera hoy
         if profesor_en_espera and profesor_en_espera["fecha"] == hoy:
@@ -178,26 +202,27 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
                         clase = session.get(Clase, al.clase_id)
                         break
 
-            # 3. Si aún no hay sesión hoy, pero el alumno pertenece a una clase del único profesor
+            # 3. Si aún no hay sesión hoy, pero el alumno tiene clase asignada: auto-abrimos la sesión de hoy
             if not sesion_hoy:
-                # Comprobar si hay un único profesor en el sistema
-                profesor_unico = session.exec(select(Profesor)).first()
-                if profesor_unico and alumno_elegido:
-                    c = session.get(Clase, alumno_elegido.clase_id)
-                    if c and c.profesor_id == profesor_unico.id:
-                        # Auto-abrir sesión para facilitar pruebas y uso continuo
+                if not alumno_elegido and len(alumnos_encontrados) > 0:
+                    alumno_elegido = alumnos_encontrados[0]
+                    clase = session.get(Clase, alumno_elegido.clase_id)
+
+                if alumno_elegido:
+                    clase = clase or session.get(Clase, alumno_elegido.clase_id)
+                    if clase:
+                        # Auto-abrir sesión para facilitar el registro inmediato
                         sesion_hoy = Sesion(clase_id=alumno_elegido.clase_id, fecha=hoy, hora_apertura=hora_actual)
                         session.add(sesion_hoy)
                         session.commit()
                         session.refresh(sesion_hoy)
-                        clase = c
-                        print(f"  [SESION] Abierta automaticamente para: {clase.nombre_clase}")
+                        print(f"  [SESION] Abierta automáticamente para: {clase.nombre_clase}")
 
             if not sesion_hoy or not alumno_elegido:
                 return {
                     "status": "error",
                     "tipo": "alumno",
-                    "mensaje": "No hay sesión abierta hoy para este grupo. El profesor debe escanear su credencial primero o presionar 'Abrir registro de hoy'.",
+                    "mensaje": "No hay sesión abierta hoy para este grupo. El profesor debe escanear su credencial primero o presionar 'Abrir sesión de hoy'.",
                 }
 
         # 4. Registrar o actualizar la asistencia del alumno
@@ -215,8 +240,13 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
             return {
                 "status": "ok",
                 "tipo": "alumno",
+                "alumno_id": alumno_elegido.id,
+                "codigo": alumno_elegido.codigo_alumno,
                 "nombre": alumno_elegido.nombre_alumno,
                 "clase": clase.nombre_clase if clase else "",
+                "clase_id": alumno_elegido.clase_id,
+                "sesion_id": sesion_hoy.id,
+                "hora": hora_actual.strftime("%H:%M:%S"),
                 "mensaje": f"Asistencia ya registrada. Hora actualizada a {hora_actual.strftime('%H:%M:%S')}.",
             }
         else:
@@ -231,8 +261,13 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
             return {
                 "status": "ok",
                 "tipo": "alumno",
+                "alumno_id": alumno_elegido.id,
+                "codigo": alumno_elegido.codigo_alumno,
                 "nombre": alumno_elegido.nombre_alumno,
                 "clase": clase.nombre_clase if clase else "",
+                "clase_id": alumno_elegido.clase_id,
+                "sesion_id": sesion_hoy.id,
+                "hora": hora_actual.strftime("%H:%M:%S"),
                 "mensaje": f"Asistencia registrada con éxito: {alumno_elegido.nombre_alumno}",
             }
 
@@ -248,7 +283,41 @@ def procesar_escaneo(datos: ScanRequest, session: Session = Depends(get_session)
 
 
 # ─────────────────────────────────────────────────────────────
-# 4. Abrir sesión del día manualmente desde la interfaz web
+# 4. Consultar estado de sesión de hoy (Endpoint para polling UI)
+# ─────────────────────────────────────────────────────────────
+@router.get("/sesiones/hoy/{clase_id}")
+def estado_sesion_hoy(clase_id: int, session: Session = Depends(get_session)):
+    """
+    Devuelve el estado de la sesión de hoy para una clase:
+    si está abierta, id de sesión y lista de IDs de alumnos con asistencia hoy.
+    """
+    hoy = date.today()
+    stmt_ses = select(Sesion).where(Sesion.clase_id == clase_id, Sesion.fecha == hoy)
+    sesion = session.exec(stmt_ses).first()
+
+    if not sesion:
+        return {
+            "abierta": False,
+            "sesion_id": None,
+            "fecha": str(hoy),
+            "asistencias": [],
+            "total": 0,
+        }
+
+    stmt_asist = select(Asistencia.alumno_id).where(Asistencia.sesion_id == sesion.id)
+    alumno_ids = [row for row in session.exec(stmt_asist).all()]
+
+    return {
+        "abierta": True,
+        "sesion_id": sesion.id,
+        "fecha": str(sesion.fecha),
+        "asistencias": alumno_ids,
+        "total": len(alumno_ids),
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# 5. Abrir sesión del día manualmente desde la interfaz web
 # ─────────────────────────────────────────────────────────────
 @router.post("/sesiones/{clase_id}/abrir")
 def abrir_sesion_manualmente(clase_id: int, session: Session = Depends(get_session)):
