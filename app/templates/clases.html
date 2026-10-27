@@ -203,6 +203,105 @@
     </div>
   </div>
 
+
+  {# ══════════════════════════════════════════════════════════
+     EASTER EGG: Botón flotante + Modal Padawans 2026
+     ══════════════════════════════════════════════════════════ #}
+  <style>
+    /* ── Botón flotante Easter Egg ── */
+    .ee-fab {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: #fff;
+      font-size: 1.6rem;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(59,130,246,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9000;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .ee-fab:hover {
+      transform: scale(1.12);
+      box-shadow: 0 6px 24px rgba(59,130,246,.6);
+    }
+    .ee-fab:active { transform: scale(.92); }
+
+    /* ── Modal Padawans ── */
+    .ee-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.65);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000;
+      opacity: 0; pointer-events: none;
+      transition: opacity .35s;
+    }
+    .ee-modal-overlay.activo {
+      opacity: 1; pointer-events: auto;
+    }
+    .ee-modal-box {
+      background: #111827;
+      border-radius: 18px;
+      padding: 1.5rem;
+      max-width: 520px;
+      width: 92%;
+      text-align: center;
+      box-shadow: 0 12px 48px rgba(0,0,0,.6);
+      transform: scale(.85);
+      transition: transform .35s;
+    }
+    .ee-modal-overlay.activo .ee-modal-box {
+      transform: scale(1);
+    }
+    .ee-modal-box h2 {
+      color: #f9fafb;
+      font-size: 1.5rem;
+      margin-bottom: .75rem;
+      font-weight: 800;
+      letter-spacing: .5px;
+    }
+    .ee-modal-box img {
+      width: 100%;
+      border-radius: 12px;
+      margin-bottom: .5rem;
+    }
+    .ee-modal-box .ee-close {
+      margin-top: .5rem;
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.25);
+      color: #d1d5db;
+      padding: .45rem 1.4rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .9rem;
+      transition: background .2s;
+    }
+    .ee-modal-box .ee-close:hover {
+      background: rgba(255,255,255,.1);
+    }
+  </style>
+
+  <!-- Botón flotante -->
+  <button class="ee-fab" id="ee-fab" title="🤫">⭐</button>
+
+  <!-- Modal Padawans -->
+  <div class="ee-modal-overlay" id="ee-modal">
+    <div class="ee-modal-box">
+      <h2>✨ Padawans 2026 ✨</h2>
+      <img src="/static/padawans.jpg" alt="Padawans 2026" />
+      <br>
+      <button class="ee-close" id="ee-modal-close">Cerrar</button>
+    </div>
+  </div>
+
 {% endblock %}
 
 
@@ -281,6 +380,45 @@
     formEliminar.action = `/clases/${claseId}/eliminar`;
     modalConfirmar.classList.add('activo');
   }
+
+  // ── EASTER EGG ──────────────────────────────────────────────
+  (function() {
+    const fab       = document.getElementById('ee-fab');
+    const eeModal   = document.getElementById('ee-modal');
+    const eeClose   = document.getElementById('ee-modal-close');
+
+    // AudioContext para generar sonidos sintéticos (sin archivos)
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+
+    function playRandomSound() {
+      const ctx = new AudioCtx();
+      const type = ['sine','square','triangle','sawtooth'][Math.floor(Math.random()*4)];
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      // Frecuencia aleatoria entre 220 y 880 Hz
+      osc.frequency.value = 220 + Math.random() * 660;
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    }
+
+    fab.addEventListener('click', () => {
+      playRandomSound();
+      // 1 de cada 10 veces abre el modal
+      if (Math.random() < 0.1) {
+        eeModal.classList.add('activo');
+      }
+    });
+
+    eeClose.addEventListener('click', () => eeModal.classList.remove('activo'));
+    eeModal.addEventListener('click', (e) => {
+      if (e.target === eeModal) eeModal.classList.remove('activo');
+    });
+  })();
 </script>
 {% endblock %}
 
